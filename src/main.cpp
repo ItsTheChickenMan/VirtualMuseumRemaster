@@ -5,6 +5,7 @@
 #include <camera.h>
 #include <utils.h>
 #include <shapes.h>
+#include <audio.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -76,6 +77,15 @@ int main(){
 	VertexData* cubeData = createVertexData(cube, 36, sizeof(cube), defaultComponentOrder, sizeof(defaultComponentOrder)/sizeof(uint32_t));
 	VertexData* triangle2DData = createVertexData(triangle_2D_Tex, 3, sizeof(triangle_2D_Tex), vertexAndTextureOrder, sizeof(vertexAndTextureOrder)/sizeof(uint32_t));
 	
+	// load sounds
+	printf("Done\nLoading sounds...");
+	
+	std::string filenames[] = {"./res/sounds/test1.ogg", "./res/sounds/test2.ogg"};
+	std::string keys[] = {"test1", "test2"};
+	
+	loadSoundFileBatch(filenames, keys, sizeof(filenames)/sizeof(std::string));
+	
+	// load scene things (camera, renderable objects)
 	printf("Done\nLoading scene...");
 	
 	// create camera
@@ -93,6 +103,9 @@ int main(){
 		
 		// update cube position
 		//setRenderableObjectTransform(object, glm::vec3(sin(glfwGetTime()/4)*5.f, 0.0f, cos(glfwGetTime()/4)*5.f), glm::vec3(0.0f, -glfwGetTime()*10, 0.0f), glm::vec3(1.0f));
+		
+		// sounds //
+		updateSounds();
 		
 		// render calls //
 		clearWindow(0.3f, 0.0f, 0.0f);
