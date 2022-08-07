@@ -6,10 +6,16 @@
 #include <utils.h>
 #include <shapes.h>
 #include <audio.h>
+#include <mouse.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+
+#include <glm/gtx/norm.hpp>
+
+glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera);
+glm::vec3 calculateRotationVector();
 
 int main(){
 	// init //
@@ -35,9 +41,11 @@ int main(){
 	
 	// make sure it exists
 	if(window == NULL){
-		printf("There was an error creating the render window\n");
+		printf("\nThere was an error creating the render window\n");
 		exit(EXIT_FAILURE);
 	}
+	
+	initMouseManager(window);
 	
 	printf("Done\nLoading shaders...");
 	
@@ -99,10 +107,13 @@ int main(){
 	// render loop //
 	while(!shouldWindowClose(window)){
 		// update camera
-		//updateCameraViewMatrix(camera, glm::vec3(sin(glfwGetTime()*1.25f)*5.f, 0.0f, 0.0f), glm::vec3(0.0f));
+		glm::vec3 rotationVector = calculateRotationVector();
+		glm::vec3 movementVector = calculateMovementVector(window, camera);
 		
-		// update cube position
-		//setRenderableObjectTransform(object, glm::vec3(sin(glfwGetTime()/4)*5.f, 0.0f, cos(glfwGetTime()/4)*5.f), glm::vec3(0.0f, -glfwGetTime()*10, 0.0f), glm::vec3(1.0f));
+		rotateCamera(camera, rotationVector);
+		translateCamera(camera, movementVector);
+		
+		resetMouseDelta();
 		
 		// sounds //
 		updateSounds();
@@ -139,4 +150,40 @@ int main(){
 	free(window);
 	
 	return EXIT_SUCCESS;
+}
+
+glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera){
+	// settings
+	int32_t keymap[] = {GLFW_KEY_W, GLFW_KEY_A, GLFW_KEY_S, GLFW_KEY_D, GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT};
+	
+	glm::vec3 side = glm::normalize(glm::cross(camera->forward, camera->up));
+	
+	glm::vec3 directions[] = {camera->forward, side * -1.f, camera->forward * -1.f, side, camera->up, camera->up * -1.f};
+	
+	float speed = 0.1f;
+	
+	// calculation
+	
+	glm::vec3 movementVector = glm::vec3(0);
+	
+	
+	for(uint32_t i = 0; i < (uint32_t)sizeof(keymap)/sizeof(int32_t); i++){
+		int32_t key = keymap[i];
+		
+		if(glfwGetKey(window->glfwWindow, key) == GLFW_PRESS){
+			movementVector += directions[i];
+		}
+	}
+	
+	if(glm::length2(movementVector) != 0.0f) movementVector = glm::normalize(movementVector) * speed;
+	
+	return movementVector;
+}
+
+glm::vec3 calculateRotationVector(){
+	float sensitivity = 0.008f;
+	
+	glm::vec2 delta = getMouseDelta() * sensitivity;
+	
+	return glm::vec3(delta.y, delta.x, 0);
 }

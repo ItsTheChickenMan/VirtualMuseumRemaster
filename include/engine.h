@@ -8,7 +8,9 @@
 // scene
 // contain static renderable objects
 struct Scene {
+	RenderableObject* staticObjects;
 	
+	uint32_t staticObjectCount;
 };
 
 #endif

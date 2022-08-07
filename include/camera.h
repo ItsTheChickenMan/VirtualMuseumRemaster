@@ -32,6 +32,10 @@ struct PerspectiveCamera {
 // camera management
 PerspectiveCamera* createPerspectiveCamera(glm::vec3 position, glm::vec3 rotation, float fov, float screenWidth, float screenHeight, float near, float far);
 void updateCameraProjectionMatrix(PerspectiveCamera *camera, float fov, float screenWidth, float screenHeight, float near, float far);
+
+void updateCameraViewMatrix(PerspectiveCamera *camera);
 void updateCameraViewMatrix(PerspectiveCamera *camera, glm::vec3 position, glm::vec3 rotation);
+void translateCamera(PerspectiveCamera *camera, glm::vec3 translation);
+void rotateCamera(PerspectiveCamera *camera, glm::vec3 rotation);
 
 #endif

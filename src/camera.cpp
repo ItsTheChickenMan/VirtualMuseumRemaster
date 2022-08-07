@@ -31,18 +31,37 @@ void updateCameraProjectionMatrix(PerspectiveCamera *camera, float fov, float sc
 }
 
 // completely updates perspective camera's view matrix with new position and rotation values.
-void updateCameraViewMatrix(PerspectiveCamera *camera, glm::vec3 position, glm::vec3 rotation){
+void updateCameraViewMatrix(PerspectiveCamera *camera){
 	// calculate forward
 	camera->forward = glm::normalize(glm::vec3(
-		cos(rotation.y) * cos(rotation.x),
-		sin(rotation.x),
-		sin(rotation.y) * cos(rotation.x)
+		cos(camera->rotation.y) * cos(camera->rotation.x),
+		sin(camera->rotation.x),
+		sin(camera->rotation.y) * cos(camera->rotation.x)
 	));
 	
-	camera->view = glm::lookAt(position, position+camera->forward, camera->up);
+	camera->view = glm::lookAt(camera->position, camera->position+camera->forward, camera->up);
 	
 	camera->pv = camera->projection * camera->view;
-	
+}
+
+// completely updates perspective camera's view matrix with new position and rotation values.
+void updateCameraViewMatrix(PerspectiveCamera *camera, glm::vec3 position, glm::vec3 rotation){
 	camera->position = position;
 	camera->rotation = rotation;
+	
+	updateCameraViewMatrix(camera);
+}
+
+// adds some translation to camera
+void translateCamera(PerspectiveCamera *camera, glm::vec3 translation){
+	camera->position += translation;
+	
+	updateCameraViewMatrix(camera);
+}
+
+// adds some rotation to camera
+void rotateCamera(PerspectiveCamera *camera, glm::vec3 rotation){
+	camera->rotation += rotation;
+	
+	updateCameraViewMatrix(camera);
 }
