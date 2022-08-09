@@ -162,16 +162,27 @@ VertexData* createVertexData(float *vertices, uint32_t vertexCount, uint32_t siz
 	return data;
 }
 
+// bind vertex data vao
+void bindVertexData(VertexData* data){
+	glBindVertexArray(data->vao);
+}
+
 // bind vertex data and call draw arrays
 void renderVertexData(VertexData* data){
 	// bind vao
-	glBindVertexArray(data->vao);
+	bindVertexData(data);
 	
 	// call draw arrays
-	glDrawArrays(GL_TRIANGLES, 0, data->vertexCount);
+	renderVertexDataNoBind(data);
 	
 	// unbind vertex array for neatness
 	glBindVertexArray(0);
+}
+
+// call draw arrays with no bind
+void renderVertexDataNoBind(VertexData* data){
+	// call draw arrays
+	glDrawArrays(GL_TRIANGLES, 0, data->vertexCount);
 }
 
 // create a renderable object (vertex data w/ model matrix)
@@ -220,6 +231,20 @@ void renderRenderableObject(RenderableObject* object, PerspectiveCamera* camera,
 	
 	// render vertex data
 	renderVertexData(object->vertexData);
+}
+
+// render a renderable object with respect to a perspective camera's transform
+// this method assumes that the shader has a pvm uniform, and has already been bound (this method will not call glUseProgram)
+// calls renderVertexDataNoBind
+void renderRenderableObjectNoBind(RenderableObject* object, PerspectiveCamera* camera, ShaderProgramEx* programEx){
+	// create pvm
+	glm::mat4 pvm = camera->pv * object->modelMatrix;
+	
+	// assign uniforms
+	glUniformMatrix4fv(getProgramExUniformLocation(programEx, "pvm"), 1, GL_FALSE, glm::value_ptr(pvm));
+	
+	// render vertex data
+	renderVertexDataNoBind(object->vertexData);
 }
 
 // print the contents of a mat4

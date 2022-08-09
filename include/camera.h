@@ -8,6 +8,10 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 
+// macros //
+#define NO_LB -HUGE_VALF
+#define NO_UB HUGE_VALF
+
 // structs //
 
 // camera
@@ -37,5 +41,6 @@ void updateCameraViewMatrix(PerspectiveCamera *camera);
 void updateCameraViewMatrix(PerspectiveCamera *camera, glm::vec3 position, glm::vec3 rotation);
 void translateCamera(PerspectiveCamera *camera, glm::vec3 translation);
 void rotateCamera(PerspectiveCamera *camera, glm::vec3 rotation);
+void constrainCameraRotation(PerspectiveCamera *camera, glm::vec3 lowerBounds, glm::vec3 upperBounds);
 
 #endif

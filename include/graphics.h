@@ -62,12 +62,15 @@ void clearWindow(float r, float g, float b);
 
 // vertex data management
 VertexData* createVertexData(float *vertices, uint32_t vertexCount, uint32_t sizeInBytes, uint32_t *componentOrder, uint32_t numComponents);
+void bindVertexData(VertexData* data);
 void renderVertexData(VertexData* data);
+void renderVertexDataNoBind(VertexData* data);
 
 // renderable object management
 RenderableObject* createRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale);
 void setRenderableObjectTransform(RenderableObject* object, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale);
 void renderRenderableObject(RenderableObject* object, PerspectiveCamera* camera, ShaderProgramEx* programEx);
+void renderRenderableObjectNoBind(RenderableObject* object, PerspectiveCamera* camera, ShaderProgramEx* programEx);
 
 void printMat4(glm::mat4 matrix);
 

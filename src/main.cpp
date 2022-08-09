@@ -1,16 +1,11 @@
 // remaster of the virtual museum I made for history about a year ago
 
-#include <graphics.h>
-#include <shader.h>
-#include <camera.h>
-#include <utils.h>
-#include <shapes.h>
-#include <audio.h>
-#include <mouse.h>
+#include <engine.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <world.h>
 
 #include <glm/gtx/norm.hpp>
 
@@ -70,21 +65,6 @@ int main(){
 	
 	ShaderProgramEx* textureTestShader = createShaderProgramEx(textureTestVs, textureTestFs, true);
 	
-	// load texture data
-	printf("Done\nLoading textures...");
-	
-	TextureData* defaultTexture = createTextureData("./res/textures/default.png");
-	
-	// load vertex data
-	printf("Done\nLoading vertex data...");
-	
-	uint32_t vertexOnlyOrder[] = {0};
-	uint32_t vertexAndTextureOrder[] = {0, 1};
-	uint32_t defaultComponentOrder[] = {0, 1, 2};
-	
-	VertexData* cubeData = createVertexData(cube, 36, sizeof(cube), defaultComponentOrder, sizeof(defaultComponentOrder)/sizeof(uint32_t));
-	VertexData* triangle2DData = createVertexData(triangle_2D_Tex, 3, sizeof(triangle_2D_Tex), vertexAndTextureOrder, sizeof(vertexAndTextureOrder)/sizeof(uint32_t));
-	
 	// load sounds
 	printf("Done\nLoading sounds...");
 	
@@ -100,7 +80,9 @@ int main(){
 	PerspectiveCamera* camera = createPerspectiveCamera(glm::vec3(-2.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::radians(45.f), (float)screenWidth, (float)screenHeight, 0.1f, 100.f);
 
 	// create scene objects
-	RenderableObject* object = createRenderableObject(triangle2DData, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, glm::radians(90.0f), 0.0f), glm::vec3(1.0f));
+	//RenderableObject* object = createRenderableObject(cubeData, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, glm::radians(90.0f), 0.0f), glm::vec3(1.0f));
+	
+	Scene* scene = parseWorld("./res/worlds/basic.world");
 	
 	printf("Done\nRender Loop Starting\n");
 	
@@ -111,6 +93,7 @@ int main(){
 		glm::vec3 movementVector = calculateMovementVector(window, camera);
 		
 		rotateCamera(camera, rotationVector);
+		constrainCameraRotation(camera, glm::vec3(glm::radians(-89.f), NO_LB, NO_LB), glm::vec3(glm::radians(89.f), NO_UB, NO_UB));
 		translateCamera(camera, movementVector);
 		
 		resetMouseDelta();
@@ -124,25 +107,12 @@ int main(){
 		// bind shader
 		useProgramEx(textureTestShader);
 		
-		// bind textures
-		setProgramExUniformTexture(textureTestShader, "texture1", defaultTexture);
-		
 		// render
-		renderRenderableObject(object, camera, textureTestShader);
-		//renderVertexData(triangle2DData);
-		
-		// reset textures
-		resetProgramExUniformTextures(textureTestShader);
+		renderScene(scene, camera, textureTestShader);
 		
 		// swap buffers
 		updateWindow(window);
 	}
-	
-	// free allocated memory
-	free(object);
-	
-	free(triangle2DData);
-	free(cubeData);
 	
 	// kill graphics
 	terminateGraphics();
@@ -181,9 +151,11 @@ glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera){
 }
 
 glm::vec3 calculateRotationVector(){
-	float sensitivity = 0.008f;
+	float sensitivity = 0.004f;
 	
-	glm::vec2 delta = getMouseDelta() * sensitivity;
+	glm::vec2 delta = getMouseDelta();
 	
-	return glm::vec3(delta.y, delta.x, 0);
+	delta *= sensitivity;
+	
+	return glm::vec3(-delta.y, delta.x, 0);
 }

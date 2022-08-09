@@ -4,11 +4,17 @@
 // mouse position and delta
 glm::vec2 position;
 glm::vec2 delta;
+bool firstFrame = false;
 
 void cursorPositionUpdateCallback(GLFWwindow* window, double xpos, double ypos){
 	// update delta
 	glm::vec2 temp = glm::vec2(xpos, ypos);
-	delta = temp - position;
+	
+	if(firstFrame) {
+		delta = temp - position;
+	} else {
+		firstFrame = true;
+	}
 	
 	// update position
 	position = temp;

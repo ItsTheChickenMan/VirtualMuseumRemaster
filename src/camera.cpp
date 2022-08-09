@@ -4,6 +4,7 @@
 #include <utils.h>
 
 #include <cmath>
+#include <algorithm>
 
 // create perspective camera
 PerspectiveCamera *createPerspectiveCamera(glm::vec3 position, glm::vec3 rotation, float fov, float screenWidth, float screenHeight, float near, float far){
@@ -64,4 +65,13 @@ void rotateCamera(PerspectiveCamera *camera, glm::vec3 rotation){
 	camera->rotation += rotation;
 	
 	updateCameraViewMatrix(camera);
+}
+
+void constrainCameraRotation(PerspectiveCamera *camera, glm::vec3 lowerBounds, glm::vec3 upperBounds){
+	for(uint32_t i = 0; i < 3; i++){
+		float lowerBound = lowerBounds[i];
+		float upperBound = upperBounds[i];
+		
+		camera->rotation[i] = std::clamp(camera->rotation[i], lowerBound, upperBound);
+	}
 }

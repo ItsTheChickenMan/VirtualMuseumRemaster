@@ -1,0 +1,43 @@
+# basic world file
+# lines starting with hashtags are ignored when parsed
+
+# blocks are any chars enclosed by two brackets and a delimiter character.  here are all valid blocks:
+
+# %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
+# *[shapeName, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
+# $[x, y, z, y, p, r, w, h, d, textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (or default), and vertex data (or default)
+# &[x, y, z, r, g, b, c, l, q] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), and constant+linear+quadratic values for attenuation.  NOTE: worlds can have 48 lights max, and a parser error will occur if this is exceeded.
+
+
+# some texture names have special meanings:
+
+# default = default texture used when textureName is invalid or unspecified.  if no default is defined, then an invalid or unspecified textureName throws an error while parsing.
+
+
+# some vertex data names have special meanings
+
+# default = default vertex data used when vertexDataName is invalid or unspecified.  if no default is defined, then an invalid or unspecified vertexDataName throws an error while parsing.
+
+
+
+# basic world starts here...
+
+# texture initialization blocks
+
+%[./res/textures/default.png, default]
+%[./res/textures/greyfloor.png, floor]
+
+# vertex data initialization blocks
+
+*[cube, cube]
+
+# object blocks
+
+$[0, 0, 0,    0, 0, 0,    10, 1, 10,    default,    cube]
+$[0, 1, 0,     0, 0, 0,    1, 1, 1,    floor,    cube]
+$[2, 2, 0,     0, 0, 0,    1, 1, 1,    floor,    cube]
+$[4, 3, 1,     0, 0, 0,    1, 1, 1,    floor,    cube]
+
+# light blocks
+
+# &[0, 4, 0, 1, 1, 1, 1, 1.0, 0.35, 0.44]
