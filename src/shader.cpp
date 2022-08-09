@@ -3,6 +3,9 @@
 #include <shader.h>
 #include <utils.h>
 
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -149,6 +152,9 @@ ShaderProgramEx* createShaderProgramEx(GLuint vertexShader, GLuint fragmentShade
 	
 	programEx->textureUnits = 0;
 	
+	programEx->numPointLights = 0;
+	programEx->maxPointLights = 48;
+	
 	return programEx;
 }
 
@@ -172,7 +178,7 @@ void loadShaderProgramExUniformLocations(ShaderProgramEx* programEx){
 	for(GLint i = 0; i < numUniforms; i++){
 		// name buffer
 		// FIXME: 256 could be too small of a buffer, or too large
-		char nameBuffer[256] = {(char)43};
+		char nameBuffer[256] = {'\0'};
 		
 		glGetActiveUniformName(program, (GLuint)i, 256, NULL, nameBuffer);
 		
@@ -182,7 +188,7 @@ void loadShaderProgramExUniformLocations(ShaderProgramEx* programEx){
 		// get location
 		GLint location = glGetUniformLocation(program, name.c_str());
 		
-		if(location == -1) return;
+		if(location == -1) continue;
 		
 		// save to uniform manager
 		(*programEx->uniforms)[name] = location;
@@ -200,7 +206,7 @@ GLint getProgramExUniformLocation(ShaderProgramEx* programEx, std::string name){
 
 // bind a texture to a uniform according to the number of textures currently bound
 // note that this will stop working quickly if the amount of bound textures isn't reset after drawing
-void setProgramExUniformTexture(ShaderProgramEx *programEx, const char* location, TextureData *textureData){
+void setProgramExUniformTexture(ShaderProgramEx* programEx, const char* location, TextureData* textureData){
 	// check if we've exceeded max bound textures
 	if( (int32_t)programEx->textureUnits >= programEx->maxTextureUnits ){
 		printf("Can't bind more textures, reached maximum supported texture units (%d)\n", programEx->maxTextureUnits);
@@ -220,6 +226,59 @@ void setProgramExUniformTexture(ShaderProgramEx *programEx, const char* location
 
 // reset the number of currently bound textureUnits
 // should generally be called every time something is drawn, since generally you'll be binding new textures
-void resetProgramExUniformTextures(ShaderProgramEx *programEx){
+void resetProgramExUniformTextures(ShaderProgramEx* programEx){
 	programEx->textureUnits = 0;
+}
+
+// add a new light to a uniform array of lights
+// location = array of lights
+void addProgramExPointLight(ShaderProgramEx* programEx, const char* location, PointLight* light){
+	// check if we've exceeded max lights
+	if( programEx->numPointLights >= programEx->maxPointLights ){
+		printf("Can't bind more point lights, reached maximum supported point lights (%d)\n", programEx->maxPointLights);
+		return;
+	}
+	
+	// get location name + index
+	std::string locationName(location);
+	locationName += '[';
+	locationName += std::to_string(programEx->numPointLights);
+	locationName += ']';
+	
+	// write each value to shader
+	std::string locationBuffer;
+	
+	// position
+	locationBuffer = locationName + ".position";
+	glUniform3fv(getProgramExUniformLocation(programEx, locationBuffer), 1, glm::value_ptr(light->position));
+	
+	// color
+	locationBuffer = (locationName + ".color");
+	glUniform3fv(getProgramExUniformLocation(programEx, locationBuffer), 1, glm::value_ptr(light->color));
+	
+	// strengths
+	locationBuffer = locationName + ".ambientStrength";
+	glUniform1f(getProgramExUniformLocation(programEx, locationBuffer), light->ambientStrength);
+	
+	locationBuffer = locationName + ".diffuseStrength";
+	glUniform1f(getProgramExUniformLocation(programEx, locationBuffer), light->diffuseStrength);
+	
+	// attenuation values
+	locationBuffer = locationName + ".c";
+	glUniform1f(getProgramExUniformLocation(programEx, locationBuffer), light->c);
+	
+	locationBuffer = locationName + ".l";
+	glUniform1f(getProgramExUniformLocation(programEx, locationBuffer), light->l);
+	
+	locationBuffer = locationName + ".q";
+	glUniform1f(getProgramExUniformLocation(programEx, locationBuffer), light->q);
+	
+	// update numPointLights
+	programEx->numPointLights++;
+	
+	glUniform1i(getProgramExUniformLocation(programEx, "numPointLights"), programEx->numPointLights);
+}
+
+void resetProgramExPointLights(ShaderProgramEx* programEx){
+	programEx->numPointLights = 0;
 }

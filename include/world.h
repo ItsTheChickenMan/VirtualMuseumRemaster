@@ -6,6 +6,7 @@
 // includes //
 #include <graphics.h>
 #include <texture.h>
+#include <lighting.h>
 
 #include <string>
 #include <vector>
@@ -30,6 +31,9 @@ struct Scene {
 	
 	// objects
 	std::map<VertexData*, std::vector<TexturedRenderableObject*>*>* staticObjects;
+	
+	// lights
+	std::vector<PointLight*>* pointLights;
 };
 
 // world blocks (hold information about blocks)
@@ -81,9 +85,16 @@ struct ObjectBlock {
 };
 
 struct LightBlock {
-	const static uint32_t numFloats = 9;
+	const static uint32_t numFloats = 11;
 	
+	// vector of float parameters
 	std::vector<float>* floats;
+	
+	// index of parameter being written to
+	uint32_t parameterIndex;
+	
+	// string buffer for parameter
+	std::string* parameterBuffer;
 };
 
 // methods //

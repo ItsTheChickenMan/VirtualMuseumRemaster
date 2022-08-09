@@ -6,8 +6,7 @@
 # %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
 # *[shapeName, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
 # $[x, y, z, y, p, r, w, h, d, textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (or default), and vertex data (or default)
-# &[x, y, z, r, g, b, c, l, q] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), and constant+linear+quadratic values for attenuation.  NOTE: worlds can have 48 lights max, and a parser error will occur if this is exceeded.
-
+# &[x, y, z, r, g, b, c, l, q, ambientStrength, diffuseStrength] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), constant+linear+quadratic values for attenuation (c,l,q), and ambient + diffuse strength
 
 # some texture names have special meanings:
 
@@ -26,6 +25,7 @@
 
 %[./res/textures/default.png, default]
 %[./res/textures/greyfloor.png, floor]
+%[./res/textures/wall.png, wall]
 
 # vertex data initialization blocks
 
@@ -33,11 +33,21 @@
 
 # object blocks
 
-$[0, 0, 0,    0, 0, 0,    10, 1, 10,    default,    cube]
-$[0, 1, 0,     0, 0, 0,    1, 1, 1,    floor,    cube]
-$[2, 2, 0,     0, 0, 0,    1, 1, 1,    floor,    cube]
-$[4, 3, 1,     0, 0, 0,    1, 1, 1,    floor,    cube]
+# enclosure
+$[0, 0, 0,    0, 0, 0,    10, 1, 10,    floor,    cube]
+$[0, 11, 0,    0, 0, 0,    10, 1, 10,    wall,    cube]
+$[5.5, 5.5, 0,    0, 0, 0,    1, 10, 10,   wall,    cube]
+$[-5.5, 5.5, 0,    0, 0, 0,    1, 10, 10,   wall,    cube]
+$[0, 5.5, 5.5,    0, 0, 0,    10, 10, 1,   wall,    cube]
+$[0, 5.5, -5.5,    0, 0, 0,    10, 10, 1,   wall,    cube]
+
+# fun little cubes
+$[0, 1, 0,     0, 0, 0,    1, 1, 1,    default,    cube]
+$[2, 2, 0,     0, 0, 0,    1, 1, 1,    default,    cube]
+$[4, 3, 1,     0, 0, 0,    1, 1, 1,    default,    cube]
 
 # light blocks
 
-# &[0, 4, 0, 1, 1, 1, 1, 1.0, 0.35, 0.44]
+&[0, 7, 0,    1, 1, 1,    1.0, 0.027, 0.0028,    0.1, 1]
+&[4.5, 3, 1.5,    1, 0, 0.1,    1.0, 0.14, 0.07,    0, 1]
+&[-1, 1, 2,    0.3, 1, 0,    1.0, 0.14, 0.07,    0, 1]

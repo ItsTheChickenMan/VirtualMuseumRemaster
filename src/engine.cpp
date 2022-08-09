@@ -2,6 +2,9 @@
 
 #include <engine.h>
 
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
+
 // assumes a texture uniform "texture1" exists in the shader
 void renderTexturedRenderableObject(TexturedRenderableObject* texturedRenderableObject, PerspectiveCamera* camera, ShaderProgramEx* programEx){
 	// bind texture
@@ -34,7 +37,15 @@ void renderTexturedRenderableObjectNoBind(TexturedRenderableObject* texturedRend
 }
 
 // render an entire scene
+// assumes uniforms named pointLights and numPointLights
 void renderScene(Scene* scene, PerspectiveCamera* camera, ShaderProgramEx* programEx){
+	// add lights to shader
+	for(uint32_t i = 0; i < scene->pointLights->size(); i++){
+		PointLight* light = scene->pointLights->at(i);
+		
+		if(light != NULL) addProgramExPointLight(programEx, "pointLights", light);
+	}
+	
 	// loop through vertex data
 	for (std::map<VertexData*, std::vector<TexturedRenderableObject*>*>::iterator it = scene->staticObjects->begin(); it != scene->staticObjects->end(); it++){
     // bind vertex data
@@ -42,10 +53,12 @@ void renderScene(Scene* scene, PerspectiveCamera* camera, ShaderProgramEx* progr
 		
 		if(!it->second) continue;
 		
-		
 		// render each object
 		for(uint32_t i = 0; i < it->second->size(); i++){
 			TexturedRenderableObject* object = it->second->at(i);
+			
+			// set model matrix (necessary for lighting)
+			glUniformMatrix4fv(getProgramExUniformLocation(programEx, "model"), 1, GL_FALSE, glm::value_ptr(object->renderableObject->modelMatrix));
 			
 			if(object) renderTexturedRenderableObjectNoBind(object, camera, programEx);
 		}
@@ -53,4 +66,7 @@ void renderScene(Scene* scene, PerspectiveCamera* camera, ShaderProgramEx* progr
 		// unbind vao
 		glBindVertexArray(0);
 	}
+	
+	// reset lights
+	resetProgramExPointLights(programEx);
 }

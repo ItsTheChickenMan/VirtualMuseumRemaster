@@ -32,7 +32,7 @@ int main(){
 	uint32_t screenWidth = 1280;
 	uint32_t screenHeight = 720;
 	
-	Window* window = createWindow(screenWidth, screenHeight, "Virtual Museum Remastered");
+	Window* window = createWindow(screenWidth, screenHeight, "real minecraft");
 	
 	// make sure it exists
 	if(window == NULL){
@@ -48,22 +48,28 @@ int main(){
 	// NOTE: make sure to only do this when the window is created, so as to have a valid context
 	
 	// barebones shader
-	uint32_t barebonesVs = createShader(GL_VERTEX_SHADER, "./res/shader/barebones/vertex.glsl");
-	uint32_t barebonesFs = createShader(GL_FRAGMENT_SHADER, "./res/shader/barebones/fragment.glsl");
+	//uint32_t barebonesVs = createShader(GL_VERTEX_SHADER, "./res/shader/barebones/vertex.glsl");
+	//uint32_t barebonesFs = createShader(GL_FRAGMENT_SHADER, "./res/shader/barebones/fragment.glsl");
 	
-	uint32_t barebonesShader = createShaderProgram(barebonesVs, barebonesFs, true);
+	//uint32_t barebonesShader = createShaderProgram(barebonesVs, barebonesFs, true);
 	
 	// renderable object test
-	uint32_t renderableObjectTestVs = createShader(GL_VERTEX_SHADER, "./res/shader/renderableObjectTest/vertex.glsl");
-	uint32_t renderableObjectTestFs = createShader(GL_FRAGMENT_SHADER, "./res/shader/renderableObjectTest/fragment.glsl");
+	//uint32_t renderableObjectTestVs = createShader(GL_VERTEX_SHADER, "./res/shader/renderableObjectTest/vertex.glsl");
+	//uint32_t renderableObjectTestFs = createShader(GL_FRAGMENT_SHADER, "./res/shader/renderableObjectTest/fragment.glsl");
 	
-	ShaderProgramEx* renderableObjectTestShader = createShaderProgramEx(renderableObjectTestVs, renderableObjectTestFs, true);
+	//ShaderProgramEx* renderableObjectTestShader = createShaderProgramEx(renderableObjectTestVs, renderableObjectTestFs, true);
 	
 	// texture test
-	uint32_t textureTestVs = createShader(GL_VERTEX_SHADER, "./res/shader/textureTest/vertex.glsl");
-	uint32_t textureTestFs = createShader(GL_FRAGMENT_SHADER, "./res/shader/textureTest/fragment.glsl");
+	//uint32_t textureTestVs = createShader(GL_VERTEX_SHADER, "./res/shader/textureTest/vertex.glsl");
+	//uint32_t textureTestFs = createShader(GL_FRAGMENT_SHADER, "./res/shader/textureTest/fragment.glsl");
 	
-	ShaderProgramEx* textureTestShader = createShaderProgramEx(textureTestVs, textureTestFs, true);
+	//ShaderProgramEx* textureTestShader = createShaderProgramEx(textureTestVs, textureTestFs, true);
+	
+	// lighting shader
+	uint32_t lightingVs = createShader(GL_VERTEX_SHADER, "./res/shader/lighting/vertex.glsl");
+	uint32_t lightingFs = createShader(GL_FRAGMENT_SHADER, "./res/shader/lighting/fragment.glsl");
+	
+	ShaderProgramEx* lightingShader = createShaderProgramEx(lightingVs, lightingFs, true);
 	
 	// load sounds
 	printf("Done\nLoading sounds...");
@@ -105,10 +111,10 @@ int main(){
 		clearWindow(0.3f, 0.0f, 0.0f);
 	
 		// bind shader
-		useProgramEx(textureTestShader);
+		useProgramEx(lightingShader);
 		
 		// render
-		renderScene(scene, camera, textureTestShader);
+		renderScene(scene, camera, lightingShader);
 		
 		// swap buffers
 		updateWindow(window);

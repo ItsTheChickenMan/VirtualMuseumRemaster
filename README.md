@@ -1,6 +1,6 @@
 # VirtualMuseumRemaster
 
-The intent of this project is to remaster the project I completed in April of 2021.  While enjoyed by the intended audience (my history teacher), it's very flawed in numerous ways which are documented in the [README](https://github.com/ItsTheChickenMan/HistoryProject/blob/master/README.md) file of the original, and in many other ways not documented.  This project aims to improve the look and feel of the experience as well as fix bugs.  The only thing I plan to keep at the moment is the original audio.
+The intent of this project is to remaster the project I completed in April of 2021.  While enjoyed by the intended audience (my history teacher), it's very flawed in numerous ways which are documented in the [README](https://github.com/ItsTheChickenMan/HistoryProject/blob/master/README.md) file of the original, and in many other ways not documented.  This project aims to improve the look and feel of the experience as well as fix bugs.  The only things I plan to keep at the moment are the original audio and maybe some textures.
 
 ## Prompt
 

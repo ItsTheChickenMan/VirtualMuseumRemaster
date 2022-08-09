@@ -72,6 +72,7 @@ void setRenderableObjectTransform(RenderableObject* object, glm::vec3 position, 
 void renderRenderableObject(RenderableObject* object, PerspectiveCamera* camera, ShaderProgramEx* programEx);
 void renderRenderableObjectNoBind(RenderableObject* object, PerspectiveCamera* camera, ShaderProgramEx* programEx);
 
+// utils
 void printMat4(glm::mat4 matrix);
 
 #endif

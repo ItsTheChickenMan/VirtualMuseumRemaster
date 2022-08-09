@@ -14,7 +14,7 @@ SRC_DIR=./src/
 OBJ_DIR=$(INSTALL_DIR)obj/
 
 # obj formatting
-_OBJ=glad.o utils.o audio.o mouse.o texture.o shader.o camera.o graphics.o world.o engine.o main.o
+_OBJ=glad.o utils.o audio.o mouse.o texture.o lighting.o shader.o camera.o graphics.o world.o engine.o main.o
 OBJ=$(patsubst %,$(OBJ_DIR)%,$(_OBJ))
 
 # lib directories string (-L./dir/ -L./otherdir/)
@@ -44,6 +44,7 @@ $(INSTALL_DIR)$(OUT): $(OBJ)
 # define obj prerequisites
 $(OBJ_DIR)graphics.o: $(SRC_DIR)graphics.cpp $(INCLUDE_DIR)graphics.h
 $(OBJ_DIR)texture.o: $(SRC_DIR)texture.cpp $(INCLUDE_DIR)texture.h
+$(OBJ_DIR)lighting.o: $(SRC_DIR)lighting.cpp $(INCLUDE_DIR)lighting.h
 $(OBJ_DIR)shader.o: $(SRC_DIR)shader.cpp $(INCLUDE_DIR)shader.h
 $(OBJ_DIR)camera.o: $(SRC_DIR)camera.cpp $(INCLUDE_DIR)camera.h
 $(OBJ_DIR)glad.o: $(SRC_DIR)glad/glad.c

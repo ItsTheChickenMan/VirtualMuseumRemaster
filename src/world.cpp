@@ -291,11 +291,95 @@ void objectBlockToScene(void** block, Scene* scene){
 }
 
 bool lightBlockCharParser(void** block, char byte){
+	// cast pointer to block type
+	LightBlock* lightBlock = (LightBlock*)(*block);
+	
+	// ensure that block exists, create it if it doesn't
+	if(*block == NULL){
+		lightBlock = allocateMemoryForType<LightBlock>();
+		
+		// construct members
+		lightBlock->floats = new std::vector<float>();
+		lightBlock->parameterIndex = 0;
+		lightBlock->parameterBuffer= new std::string();
+		
+		// point block to created lightBlock
+		*block = (void*)lightBlock;
+		
+		// because this should be created on the first byte, we can safely exit here to avoid the open bracket being included
+		return false;
+	}
+	
+	// parse byte
+	
+	// add byte to parameter buffer if it's not equal to the parameter delimiter or the close block
+	if(byte != parameterDelimiter && byte != blockClose){
+		lightBlock->parameterBuffer->push_back(byte);
+	} else {
+		// flush parameter buffer
+		
+		// if parsing floats, convert the buffer to a float and push to floats
+		float floatParameter = std::stof(*lightBlock->parameterBuffer);
+		
+		// push to floats buffer
+		lightBlock->floats->push_back(floatParameter);
+		
+		// reset parameterBuffer
+		lightBlock->parameterBuffer->erase(0, std::string::npos);
+		
+		// if parameterIndex is at the maximum value, return true (done)
+		if(lightBlock->parameterIndex+1 == LightBlock::numFloats){
+			// block is done parsing
+			return true;
+		}
+		
+		// otherwise, increment parameterIndex
+		lightBlock->parameterIndex++;
+	}
 	
 	return false;
 }
 
 void lightBlockToScene(void** block, Scene* scene){
+	// cast block to block type
+	LightBlock* lightBlock = (LightBlock*)(*block);
+	
+	// load values
+	float x = lightBlock->floats->at(0);
+	float y = lightBlock->floats->at(1);
+	float z	= lightBlock->floats->at(2);
+	
+	float r = lightBlock->floats->at(3);
+	float g = lightBlock->floats->at(4);
+	float b = lightBlock->floats->at(5);
+	
+	float c = lightBlock->floats->at(6);
+	float l = lightBlock->floats->at(7);
+	float q = lightBlock->floats->at(8);
+	
+	float as = lightBlock->floats->at(9);
+	float ds = lightBlock->floats->at(10);
+	
+	glm::vec3 position = glm::vec3(x, y, z);
+	glm::vec3 color = glm::vec3(r, g, b);
+	
+	// create light
+	PointLight* light = createPointLight(position, color, as, ds, c, l, q);
+	
+	// add to scene
+	scene->pointLights->push_back(light);
+	
+	// delete contents of block
+	// remove the parameter buffer
+	delete lightBlock->parameterBuffer;
+	
+	// delete the parameters object
+	delete lightBlock->floats;
+	
+	// free memory
+	free(lightBlock);
+	
+	*block = NULL;
 }
 
 // create the shell of a scene
@@ -307,6 +391,7 @@ Scene* createScene(){
 	scene->vertexData = new std::map<std::string, VertexData*>();
 	scene->textures = new std::map<std::string, TextureData*>();
 	scene->staticObjects = new std::map<VertexData*, std::vector<TexturedRenderableObject*>*>();
+	scene->pointLights = new std::vector<PointLight*>();
 	
 	return scene;
 }
