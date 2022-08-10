@@ -12,11 +12,12 @@ out vec3 FragPos;
 // uniforms
 uniform mat4 pvm; // projection * view * model
 uniform mat4 model; // just model
+uniform mat3 normalMatrix; // matrix for adjusting normals for model matrix
 
 void main(){
 	gl_Position = pvm * vec4(vertexPosition, 1);
 
 	TexCoords = textureCoords;
-	Normal = normalize(normal);
+	Normal = normalMatrix * normalize(normal);
 	FragPos = vec3(model * vec4(vertexPosition, 1));
 }

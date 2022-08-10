@@ -37,7 +37,7 @@ void renderTexturedRenderableObjectNoBind(TexturedRenderableObject* texturedRend
 }
 
 // render an entire scene
-// assumes uniforms named pointLights and numPointLights
+// assumes uniforms named pointLights, numPointLights, and normalMatrix exist
 void renderScene(Scene* scene, PerspectiveCamera* camera, ShaderProgramEx* programEx){
 	// add lights to shader
 	for(uint32_t i = 0; i < scene->pointLights->size(); i++){
@@ -57,10 +57,16 @@ void renderScene(Scene* scene, PerspectiveCamera* camera, ShaderProgramEx* progr
 		for(uint32_t i = 0; i < it->second->size(); i++){
 			TexturedRenderableObject* object = it->second->at(i);
 			
+			if(!object) continue;
+			
 			// set model matrix (necessary for lighting)
 			glUniformMatrix4fv(getProgramExUniformLocation(programEx, "model"), 1, GL_FALSE, glm::value_ptr(object->renderableObject->modelMatrix));
 			
-			if(object) renderTexturedRenderableObjectNoBind(object, camera, programEx);
+			// set normal matrix (necessary for lighting)
+			glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(object->renderableObject->modelMatrix)));
+			glUniformMatrix3fv(getProgramExUniformLocation(programEx, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
+	
+			renderTexturedRenderableObjectNoBind(object, camera, programEx);
 		}
 		
 		// unbind vao

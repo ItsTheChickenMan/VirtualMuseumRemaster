@@ -65,6 +65,9 @@ Window* createWindow(int32_t width, int32_t height, const char* title){
 	// default settings
 	glEnable(GL_DEPTH_TEST);
 	
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	
 	glfwSwapInterval(1);
 	
 	return window;

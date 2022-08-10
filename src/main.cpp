@@ -32,7 +32,7 @@ int main(){
 	uint32_t screenWidth = 1280;
 	uint32_t screenHeight = 720;
 	
-	Window* window = createWindow(screenWidth, screenHeight, "real minecraft");
+	Window* window = createWindow(screenWidth, screenHeight, "Virtual Museum Remastered");
 	
 	// make sure it exists
 	if(window == NULL){
