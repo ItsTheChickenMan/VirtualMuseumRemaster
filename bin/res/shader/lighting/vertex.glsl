@@ -18,6 +18,6 @@ void main(){
 	gl_Position = pvm * vec4(vertexPosition, 1);
 
 	TexCoords = textureCoords;
-	Normal = normalMatrix * normalize(normal);
+	Normal = normalize(normalMatrix * normal);
 	FragPos = vec3(model * vec4(vertexPosition, 1));
 }

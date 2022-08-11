@@ -138,6 +138,14 @@ glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera){
 	
 	float speed = 0.1f;
 	
+	if(glfwGetKey(window->glfwWindow, GLFW_KEY_E) == GLFW_PRESS){
+		speed /= 3.0f;
+	}
+	
+	if(glfwGetKey(window->glfwWindow, GLFW_KEY_Q) == GLFW_PRESS){
+		speed *= 3.0f;
+	}
+	
 	// calculation
 	
 	glm::vec3 movementVector = glm::vec3(0);

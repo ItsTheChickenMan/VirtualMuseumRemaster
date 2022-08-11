@@ -1,16 +1,16 @@
 # basic world file
 # lines starting with hashtags are ignored when parsed
 
-# blocks are any chars enclosed by two brackets and a delimiter character.  here are all valid blocks:
+# blocks are any chars enclosed by two brackets and a delimiter character.  here are all valid blocks (* = optional):
 
 # %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
-# *[shapeName, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
-# $[x, y, z, y, p, r, w, h, d, textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (or default), and vertex data (or default)
+# *[shapeName/modelPath, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block.  NOTE: if this can't find shapeName in shapes.h, it will assume it is a path to a model and load it with assimp
+# $[x, y, z, y, p, r, w, h, d, *textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (not required if using a model, which load their own textures), and vertex data (or default)
 # &[x, y, z, r, g, b, c, l, q, ambientStrength, diffuseStrength] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), constant+linear+quadratic values for attenuation (c,l,q), and ambient + diffuse strength
 
 # some texture names have special meanings:
 
-# default = default texture used when textureName is invalid or unspecified.  if no default is defined, then an invalid or unspecified textureName throws an error while parsing.
+# default = default texture used when textureName is invalid.  if no default is defined, then an invalid textureName throws an error while parsing.
 
 
 # some vertex data names have special meanings
@@ -30,7 +30,12 @@
 # vertex data initialization blocks
 
 *[cube, cube]
-*[triangle_2D_Tex, triangle_2D_Tex]
+
+# model blocks
+
++[./res/models/Avocado.glb, avocado]
++[./res/models/SmilingFace.glb, smiley]
++[./res/models/CesiumMan.glb, man]
 
 # object blocks
 
@@ -43,9 +48,9 @@ $[0, 5.5, 5.5,    0, 0, 0,    10, 10, 1,   wall,    cube]
 $[0, 5.5, -5.5,    0, 0, 0,    10, 10, 1,   wall,    cube]
 
 # fun little cubes
-$[0, 1, 0,     0, 0, 0,    1, 1, 1,    default,    cube]
-$[2, 2, 0,     0, 0, 0,    1, 1, 1,    default,    cube]
-$[4, 3, 1,     0, 0, 0,    1, 1, 1,    default,    cube]
+$[0, 1, 0,     0, 0, 0,    0.2, 0.2, 0.2,    avocado]
+$[2, 2, 0,     0, 0, 0,    1, 1, 1,    smiley]
+$[4, 3, 1,     -1.57, 3.14, 0,    3, 3, 3,    man]
 
 # light blocks
 
@@ -53,3 +58,4 @@ $[4, 3, 1,     0, 0, 0,    1, 1, 1,    default,    cube]
 &[3, 3, 3,    1, 0, 0.1,    1.0, 0.35, 0.44,    0, 1]
 &[-1, 1, 2,    0.3, 1, 0,    1.0, 0.14, 0.07,    0, 1]
 &[-4.5, 2, -4.5,    0, 0.1, 1,    1.0, 0.14, 0.07,    0, 1]
+&[-2, 2, -2,    1, 0.1, 1,    1.0, 0.027, 0.0028,    0, 1]

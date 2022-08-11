@@ -24,7 +24,7 @@ TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData,
 	return createTexturedRenderableObject(object, texture);
 }
 
-// from existing rendearble object and new texture data params
+// from existing renderable object and new texture data params
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, const char* texturePath){
 	TextureData* texture = createTextureData(texturePath);
 	
@@ -50,6 +50,7 @@ const char textureBlockDelimiter = '%';
 const char vertexDataBlockDelimiter = '*';
 const char objectBlockDelimiter = '$';
 const char lightBlockDelimiter = '&';
+const char modelBlockDelimiter = '+';
 
 // texture char parser	
 bool textureBlockCharParser(void** block, char byte){	
@@ -198,7 +199,7 @@ bool objectBlockCharParser(void** block, char byte){
 			objectBlock->parameterBuffer->erase(0, std::string::npos);
 			
 			// check if this is the end
-			if(objectBlock->parameterIndex+1 == ObjectBlock::numFloats+ObjectBlock::numStrings){
+			if(objectBlock->parameterIndex+1 == ObjectBlock::numFloats+ObjectBlock::numStrings || byte == blockClose){
 				// last argument reached, return true to indicate that we're done parsing
 				return true;
 			}
@@ -215,37 +216,7 @@ void objectBlockToScene(void** block, Scene* scene){
 	// cast pointer to block type
 	ObjectBlock* objectBlock = (ObjectBlock*)(*block);
 	
-	// load values
-	std::string textureName = objectBlock->strings->at(0);
-	std::string vertexDataName = objectBlock->strings->at(1);
-	
-	// check texture
-	TextureData* texture = (*scene->textures)[textureName];
-	
-	if(!texture){
-		printf("Invalid texture name %s", textureName.c_str());
-		
-		TextureData* def = scene->textures->at("default");
-		
-		if(def){
-			texture = def;
-			printf(", reverting to default\n");
-		} else {
-			printf("Invalid texture name %s with no default present\n");
-			
-			return; // fail
-		}
-	}
-	
-	// check vertex data
-	VertexData* vData = (*scene->vertexData)[vertexDataName];
-	
-	if(!vData){
-		printf("Invalid vertex data name %s\n", vertexDataName.c_str());
-		
-		return; // fail
-	}
-	
+	// load some float values
 	float x = objectBlock->floats->at(0);
 	float y = objectBlock->floats->at(1);
 	float z = objectBlock->floats->at(2);
@@ -262,19 +233,98 @@ void objectBlockToScene(void** block, Scene* scene){
 	glm::vec3 rotation = glm::vec3(yaw, pitch, roll);
 	glm::vec3 scale = glm::vec3(w, h, d);
 	
-	// create object
-	TexturedRenderableObject* object = createTexturedRenderableObject(vData, position, rotation, scale, texture);
+	// check amount of strings
+	uint32_t stringParams = objectBlock->strings->size();
 	
-	// push to scene
-	std::vector<TexturedRenderableObject*> *objectVector = (*scene->staticObjects)[vData];
-	
-	if(!objectVector){
-		objectVector = new std::vector<TexturedRenderableObject*>();
-		
-		(*scene->staticObjects)[vData] = objectVector;
+	// mode depends on number of string parameters (1 = model, 2 = texture + vertexData)
+	switch(stringParams){
+		case 1: {
+			// load values
+			std::string modelName = objectBlock->strings->at(0);
+			
+			// load model
+			Model* model = (*scene->models)[modelName];
+			
+			// check model
+			if(!model){
+				// FIXME: fix the various potential memory leaks in these methods when exiting too early to delete heap memory
+				printf("Invalid model name %s\n", modelName.c_str());
+				return; // fail
+			}
+			
+			// split model in textured renderable objects
+			for(uint32_t i = 0; i < model->meshes->size(); i++){
+				Mesh* mesh = model->meshes->at(i);
+				
+				// create renderable object from mesh
+				RenderableObject* object = createRenderableObject(mesh->vertexData, position, rotation, scale);
+				
+				// create textured renderable object from renderable object and mesh
+				TexturedRenderableObject* texturedObject = createTexturedRenderableObject(object, mesh->texture);
+				
+				// push to scene
+				std::vector<TexturedRenderableObject*>* objectVector = (*scene->staticObjects)[mesh->vertexData];
+				
+				if(!objectVector){
+					objectVector = new std::vector<TexturedRenderableObject*>();
+					
+					(*scene->staticObjects)[mesh->vertexData] = objectVector;
+				}
+				
+				objectVector->push_back(texturedObject);
+			}
+			
+			break;
+		}
+		case 2: {
+			// load values
+			std::string textureName = objectBlock->strings->at(0);
+			std::string vertexDataName = objectBlock->strings->at(1);
+			
+			// check texture
+			TextureData* texture = (*scene->textures)[textureName];
+			
+			if(!texture){
+				printf("Invalid texture name %s", textureName.c_str());
+				
+				TextureData* def = scene->textures->at("default");
+				
+				if(def){
+					texture = def;
+					printf(", reverting to default\n");
+				} else {
+					printf("Invalid texture name %s with no default present\n");
+					
+					return; // fail
+				}
+			}
+			
+			// check vertex data
+			VertexData* vData = (*scene->vertexData)[vertexDataName];
+			
+			if(!vData){
+				printf("Invalid vertex data name %s\n", vertexDataName.c_str());
+				
+				return; // fail
+			}
+			
+			// create object
+			TexturedRenderableObject* object = createTexturedRenderableObject(vData, position, rotation, scale, texture);
+			
+			// push to scene
+			std::vector<TexturedRenderableObject*>* objectVector = (*scene->staticObjects)[vData];
+			
+			if(!objectVector){
+				objectVector = new std::vector<TexturedRenderableObject*>();
+				
+				(*scene->staticObjects)[vData] = objectVector;
+			}
+			
+			objectVector->push_back(object);
+			
+			break;
+		}
 	}
-	
-	objectVector->push_back(object);
 	
 	// delete contents of block
 	// remove the parameter buffer
@@ -382,6 +432,36 @@ void lightBlockToScene(void** block, Scene* scene){
 	*block = NULL;
 }
 
+void modelBlockToScene(void** block, Scene* scene){
+	// cast block to block type
+	TextureBlock* modelBlock = (TextureBlock*)(*block);
+	
+	// load values
+	std::string path = modelBlock->strings->at(0);
+	std::string modelName = modelBlock->strings->at(1);
+	
+	// load model
+	Model* model = loadModel(path);
+	
+	if(!model){
+		return; // fail
+	}
+	
+	(*scene->models)[modelName] = model;
+	
+	// delete contents of block
+	// remove the parameter buffer
+	delete modelBlock->parameterBuffer;
+	
+	// delete the parameters object
+	delete modelBlock->strings;
+	
+	// free memory
+	free(modelBlock);
+	
+	*block = NULL;
+}
+
 // create the shell of a scene
 Scene* createScene(){
 	// allocate memory
@@ -390,6 +470,7 @@ Scene* createScene(){
 	// initialize values
 	scene->vertexData = new std::map<std::string, VertexData*>();
 	scene->textures = new std::map<std::string, TextureData*>();
+	scene->models = new std::map<std::string, Model*>();
 	scene->staticObjects = new std::map<VertexData*, std::vector<TexturedRenderableObject*>*>();
 	scene->pointLights = new std::vector<PointLight*>();
 	
@@ -410,7 +491,7 @@ Scene* parseWorld(const char* file){
 	Scene* scene = createScene();
 	
 	// settings
-	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter};
+	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter};
 	
 	// control states
 	bool parsingBlock = false;
@@ -422,14 +503,8 @@ Scene* parseWorld(const char* file){
 	// first param = pointer to block (void* here to be valid for all pointers)
 	// second param = char to parse
 	// returns false if the block hasn't finished parsing and true if it has
-	bool (*charParsers[4])(void**,char) {textureBlockCharParser, textureBlockCharParser, objectBlockCharParser, lightBlockCharParser};
-	void (*blockParsers[4])(void**,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene};
-	
-	/*
-	charParsers[0] = textureBlockCharParser;
-	charParsers[1] = objectBlockCharParser;
-	charParsers[2] = lightBlockCharParser;
-	*/
+	bool (*charParsers[5])(void**,char) {textureBlockCharParser, textureBlockCharParser, objectBlockCharParser, lightBlockCharParser, textureBlockCharParser};
+	void (*blockParsers[5])(void**,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene};
 	
 	// loop through each byte
 	char byte;

@@ -7,8 +7,14 @@
 
 // assumes a texture uniform "texture1" exists in the shader
 void renderTexturedRenderableObject(TexturedRenderableObject* texturedRenderableObject, PerspectiveCamera* camera, ShaderProgramEx* programEx){
+	// null checks
+	if(!texturedRenderableObject || !camera || !programEx) return;
+	
 	// bind texture
 	TextureData* textureData = texturedRenderableObject->textureData;
+	
+	// FIXME: no render for no textures?
+	if(!textureData) return;
 	
 	setProgramExUniformTexture(programEx, "texture1", textureData);
 	
@@ -22,8 +28,14 @@ void renderTexturedRenderableObject(TexturedRenderableObject* texturedRenderable
 }
 
 void renderTexturedRenderableObjectNoBind(TexturedRenderableObject* texturedRenderableObject, PerspectiveCamera* camera, ShaderProgramEx* programEx){
+	// null checks
+	if(!texturedRenderableObject || !camera || !programEx) return;
+	
 	// bind texture
 	TextureData* textureData = texturedRenderableObject->textureData;
+	
+	// FIXME: no render for no textures?
+	if(!textureData) return;
 	
 	setProgramExUniformTexture(programEx, "texture1", textureData);
 	

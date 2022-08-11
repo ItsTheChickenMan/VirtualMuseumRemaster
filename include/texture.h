@@ -4,6 +4,10 @@
 // includes
 #include <cstdint>
 
+#include <assimp/Importer.hpp>      // C++ importer interface
+#include <assimp/scene.h>           // Output data structure
+#include <assimp/postprocess.h>     // Post processing flags
+
 /**
 	*	@brief Struct representing texture data
 	*
@@ -28,5 +32,8 @@ struct TextureData {
 	*	@return TextureData to use in rendering
 */
 TextureData* createTextureData(const char* texturePath);
+
+// create texture data from raw compressed image
+TextureData* createTextureDataRawCompressed(unsigned char* buffer, uint32_t length);
 
 #endif

@@ -93,6 +93,11 @@ void clearWindow(float r, float g, float b){
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
+// vertex //
+Vertex createVertex(glm::vec3 position, glm::vec2 textureCoordinates, glm::vec3 normal){
+	return (Vertex){position, textureCoordinates, normal};
+}
+
 // vertex data //
 
 // create vertex data from a set of vertices
@@ -108,6 +113,8 @@ VertexData* createVertexData(float *vertices, uint32_t vertexCount, uint32_t siz
 	// set default values in case any methods below fail
 	data->vbo = 0;
 	data->vao = 0;
+	data->ebo = 0;
+	data->indexCount = 0;
 	data->vertexCount = vertexCount;
 	data->sizeInBytes = sizeInBytes;
 	
@@ -158,12 +165,137 @@ VertexData* createVertexData(float *vertices, uint32_t vertexCount, uint32_t siz
 		offset += componentSize;
 	}
 	
-	// unbind buffer and arary
+	// unbind buffer and array
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 	
 	return data;
 }
+
+VertexData* createVertexData(Vertex *vertices, uint32_t vertexCount, uint32_t sizeInBytes){
+	// allocate space
+	VertexData* data = allocateMemoryForType<VertexData>();
+	
+	// set default values in case any methods below fail
+	data->vbo = 0;
+	data->vao = 0;
+	data->ebo = 0;
+	data->vertexCount = vertexCount;
+	data->indexCount = 0;
+	data->sizeInBytes = sizeInBytes;
+	
+	// create vertex buffer object
+	glGenBuffers(1, &data->vbo);
+	
+	// check for success
+	// FIXME: actual error checking using gl methods
+	if(data->vbo == 0) return NULL;
+	
+	// bind buffer to array buffer target
+	glBindBuffer(GL_ARRAY_BUFFER, data->vbo);
+	
+	// copy vertex data to buffer
+	glBufferData(GL_ARRAY_BUFFER, data->sizeInBytes, vertices, GL_STATIC_DRAW); // target, size, data, purpose
+	
+	// generate vertex attribute object
+	glGenVertexArrays(1, &data->vao);
+	
+	// check for success
+	if(data->vao == 0) return NULL;
+	
+	// bind vao
+	glBindVertexArray(data->vao);
+	
+	// position
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(0));
+	glEnableVertexAttribArray(0);
+	
+	// tex coords
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3*sizeof(float)));
+	glEnableVertexAttribArray(1);
+	
+	// normal
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5*sizeof(float)));
+	glEnableVertexAttribArray(2);
+	
+	// unbind buffer and array
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	
+	return data;
+}
+
+VertexData* createVertexData(std::vector<Vertex> vertices){
+	return createVertexData(vertices, std::vector<uint32_t>());
+}
+
+VertexData* createVertexData(std::vector<Vertex> vertices, std::vector<uint32_t> indices){
+	// allocate space
+	VertexData* data = allocateMemoryForType<VertexData>();
+	
+	// set default values in case any methods below fail
+	data->vbo = 0;
+	data->vao = 0;
+	data->ebo = 0;
+	data->vertexCount = vertices.size();
+	data->indexCount = indices.size();
+	data->sizeInBytes = data->vertexCount * sizeof(Vertex);
+	
+	// create vertex buffer object
+	glGenBuffers(1, &data->vbo);
+	
+	// check for success
+	// FIXME: actual error checking using gl methods
+	if(data->vbo == 0) return NULL;
+	
+	// bind buffer to array buffer target
+	glBindBuffer(GL_ARRAY_BUFFER, data->vbo);
+	
+	// copy vertex data to buffer
+	glBufferData(GL_ARRAY_BUFFER, data->sizeInBytes, &vertices[0], GL_STATIC_DRAW); // target, size, data, purpose
+	
+	// generate vertex attribute object
+	glGenVertexArrays(1, &data->vao);
+		
+	// check for success
+	if(data->vao == 0) return NULL;
+	
+	// bind vao
+	glBindVertexArray(data->vao);
+	
+	// generate indices if they exist
+	if(indices.size() > 0){
+		// generate elements buffer
+		glGenBuffers(1, &data->ebo);
+		
+		// check for success
+		if(data->ebo == 0) return NULL;
+		
+		// copy indices data to buffer
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data->ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint32_t), &indices[0], GL_STATIC_DRAW);
+	}
+	
+	// position
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(0));
+	glEnableVertexAttribArray(0);
+	
+	// tex coords
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3*sizeof(float)));
+	glEnableVertexAttribArray(1);
+	
+	// normal
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5*sizeof(float)));
+	glEnableVertexAttribArray(2);
+	
+	// unbind buffer(s) and array
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	
+	return data;
+}
+
 
 // bind vertex data vao
 void bindVertexData(VertexData* data){
@@ -184,8 +316,14 @@ void renderVertexData(VertexData* data){
 
 // call draw arrays with no bind
 void renderVertexDataNoBind(VertexData* data){
-	// call draw arrays
-	glDrawArrays(GL_TRIANGLES, 0, data->vertexCount);
+	// call draw arrays or elements
+	if(data->ebo == 0){
+		glDrawArrays(GL_TRIANGLES, 0, data->vertexCount);
+	} else {
+		//printf("drawing elements... %d\n", data->indexCount);
+		glDrawElements(GL_TRIANGLES, data->indexCount, GL_UNSIGNED_INT, 0);
+		//printf("done.\n");
+	}
 }
 
 // create a renderable object (vertex data w/ model matrix)
@@ -250,13 +388,173 @@ void renderRenderableObjectNoBind(RenderableObject* object, PerspectiveCamera* c
 	renderVertexDataNoBind(object->vertexData);
 }
 
-// print the contents of a mat4
-void printMat4(glm::mat4 matrix){
-	for(uint32_t i = 0; i < 4; i++){
-		for(uint32_t j = 0; j < 4; j++){
-			printf("%f, ", matrix[i][j]);
+// create a mesh
+Mesh* createMesh(VertexData* vertexData, TextureData* texture){
+	Mesh* mesh = allocateMemoryForType<Mesh>();
+	
+	//mesh->vertices = new std::vector<Vertex>();
+	//mesh->indices = new std::vector<uint32_t>();
+	mesh->vertexData = vertexData;
+	mesh->texture = texture;
+	
+	return mesh;
+}
+
+// create a skeleton model
+Model* createModel(){
+	Model* model = allocateMemoryForType<Model>();
+	
+	model->meshes = new std::vector<Mesh*>();
+	model->textures = new std::map<std::string, TextureData*>();
+	model->path = NULL;
+	
+	return model;
+}
+
+// process mesh into a Mesh struct
+void processMesh(aiMesh* aiMesh, const aiScene* scene, Model* model){
+	// vectors for vertex data and indices, and a spot for texture
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+	TextureData* texture = NULL;
+	
+	// convert aiVector3Ds to glm::vec3s and create vertices
+	for(uint32_t i = 0; i < aiMesh->mNumVertices; i++){
+		aiVector3D aiPosition = aiMesh->mVertices[i];
+		aiVector3D aiNormals = aiMesh->mNormals[i];
+		
+		glm::vec3 position = glm::vec3(aiPosition.x, aiPosition.y, aiPosition.z);
+		glm::vec3 normal = glm::vec3(aiNormals.x, aiNormals.y, aiNormals.z);
+		
+		glm::vec2 textureCoords = glm::vec2(0);
+		
+		if(aiMesh->mTextureCoords[0]){
+			textureCoords = glm::vec2(aiMesh->mTextureCoords[0][i].x, aiMesh->mTextureCoords[0][i].y);
 		}
-		printf("\n");
+		
+		Vertex v = createVertex(position, textureCoords, normal);
+		
+		vertices.push_back(v);
 	}
-	printf("\n");
+	
+	// create indices
+	for(unsigned int i = 0; i < aiMesh->mNumFaces; i++){
+		aiFace face = aiMesh->mFaces[i];
+		
+		for(unsigned int j = 0; j < face.mNumIndices; j++){
+			indices.push_back(face.mIndices[j]);
+		}
+	}
+	
+	// load texture (if available and unloaded)
+	if(aiMesh->mMaterialIndex >= 0){
+		aiMaterial* material = scene->mMaterials[aiMesh->mMaterialIndex];
+		
+		if(material->GetTextureCount(aiTextureType_DIFFUSE) > 0){ 
+			// get path to texture
+			aiString aiRelativePath;
+			
+			material->GetTexture(aiTextureType_DIFFUSE, 0, &aiRelativePath);
+			
+			std::string relativePath(aiRelativePath.C_Str());
+				
+			// check if texture is loaded
+			if(model->textures->find(relativePath) != model->textures->end()){
+				// exists
+				texture = model->textures->at(relativePath);
+			} else {	
+				// check if texture is embedded
+				const aiTexture* embeddedTexture = scene->GetEmbeddedTexture(aiRelativePath.C_Str());
+				
+				if(embeddedTexture != NULL){
+					// check if we need to run through stbi
+					if(embeddedTexture->mHeight == 0){
+						// get texture data from stbi
+						texture = createTextureDataRawCompressed((unsigned char*)embeddedTexture->pcData, embeddedTexture->mWidth);
+					} else {
+						// FIXME: code
+						printf("Error: I wish this supported raw embedded texture data, but it doesn't\n");
+						texture = NULL;
+					}
+				} else {
+					// not embedded
+					texture = createTextureData( (*model->path + relativePath).c_str() );
+				}
+				
+				(*model->textures)[relativePath] = texture;
+			}
+		}
+	}
+	
+	// create vertex data
+	VertexData* data = createVertexData(vertices, indices);
+	
+	// create mesh
+	Mesh* mesh = createMesh(data, texture);
+	
+	// push mesh to model
+	model->meshes->push_back(mesh);
+}
+
+// process node into meshes, etc.
+void processNode(aiNode* node, const aiScene* scene, Model* model){
+	// load meshes
+	for(uint32_t i = 0; i < node->mNumMeshes; i++){
+		uint32_t meshIndex = node->mMeshes[i];
+		
+		aiMesh* mesh = scene->mMeshes[meshIndex];
+		
+		processMesh(mesh, scene, model);
+	}
+	
+	// process children
+	for(uint32_t i = 0; i < node->mNumChildren; i++){
+		aiNode* child = node->mChildren[i];
+		
+		processNode(child, scene, model);
+	}
+}
+
+// load multiple models from vector of paths
+void loadModels(std::vector<Model*>* models, std::string paths[], uint32_t numPaths){
+	// instantiate importer
+	Assimp::Importer importer;
+	
+	// load each model
+	for(uint32_t i = 0; i < numPaths; i++){
+		std::string& path = paths[i];
+		
+		Model* model = loadModel(importer, path);
+		
+		models->push_back(model);
+	}
+}
+
+// load a model from a file
+Model* loadModel(Assimp::Importer& importer, const std::string& path){
+	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate/* | aiProcess_FlipUVs*/); // FIXME: flip uvs?
+	
+	if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode){
+		printf("error while loading model %s: %s\n", path.c_str(), importer.GetErrorString());
+		return NULL;
+	}
+	
+	// create model
+	Model* model = createModel();
+	
+	model->path = new std::string(path);
+	
+	// process the root node (also recursively processess everything else)
+	processNode(scene->mRootNode, scene, model);
+	
+	return model;
+}
+
+// load a model from a file, creating a new importer
+Model* loadModel(const std::string& path){
+	// instantiate importer
+	Assimp::Importer importer;
+	
+	// pass it to other load model method
+	return loadModel(importer, path);
 }

@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <cstdint>
 
-// glfw
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -15,6 +14,13 @@
 #include <camera.h>
 #include <utils.h>
 #include <shader.h>
+#include <texture.h>
+
+#include <vector>
+
+#include <assimp/Importer.hpp>      // C++ importer interface
+#include <assimp/scene.h>           // Output data structure
+#include <assimp/postprocess.h>     // Post processing flags
 
 // enums //
 
@@ -31,13 +37,43 @@ struct Window {
 	GLFWwindow* glfwWindow;
 };
 
+// vertex
+struct Vertex {
+	glm::vec3 position;
+	glm::vec2 textureCoordinates;
+	glm::vec3 normal;
+};
+
 // vertex data
 struct VertexData {
 	uint32_t vbo; // vertex buffer object
 	uint32_t vao; // vertex array object
+	uint32_t ebo; // elements buffer object
 	
 	uint32_t vertexCount; // number of vertices
+	uint32_t indexCount; // number of indices, if ebo != 0 (otherwise 0)
 	uint32_t sizeInBytes;
+};
+
+// mesh
+struct Mesh {
+	//std::vector<Vertex>* vertices;
+	//std::vector<uint32_t>* indices;
+	VertexData* vertexData;
+	
+	TextureData* texture; // TODO: multiple?
+};
+
+// model
+struct Model {
+	// meshes
+	std::vector<Mesh*>* meshes;
+	
+	// loaded textures
+	std::map<std::string, TextureData*>* textures;
+	
+	// path to model
+	std::string* path;
 };
 
 // renderable object
@@ -60,8 +96,14 @@ bool shouldWindowClose(Window* window);
 void updateWindow(Window* window);
 void clearWindow(float r, float g, float b);
 
+// vertex management
+Vertex createVertex(glm::vec3 position, glm::vec2 textureCoordinates, glm::vec3 normal);
+
 // vertex data management
 VertexData* createVertexData(float *vertices, uint32_t vertexCount, uint32_t sizeInBytes, uint32_t *componentOrder, uint32_t numComponents);
+VertexData* createVertexData(Vertex *vertices, uint32_t vertexCount, uint32_t sizeInBytes);
+VertexData* createVertexData(std::vector<Vertex> vertices);
+VertexData* createVertexData(std::vector<Vertex> vertices, std::vector<uint32_t> indices);
 void bindVertexData(VertexData* data);
 void renderVertexData(VertexData* data);
 void renderVertexDataNoBind(VertexData* data);
@@ -72,7 +114,11 @@ void setRenderableObjectTransform(RenderableObject* object, glm::vec3 position, 
 void renderRenderableObject(RenderableObject* object, PerspectiveCamera* camera, ShaderProgramEx* programEx);
 void renderRenderableObjectNoBind(RenderableObject* object, PerspectiveCamera* camera, ShaderProgramEx* programEx);
 
-// utils
-void printMat4(glm::mat4 matrix);
+// model management
+Mesh* createMesh(VertexData* vertexData, TextureData* texture);
+Model* createModel();
+void loadModels(std::vector<Model*>* models, std::string paths[], uint32_t numPaths);
+Model* loadModel(Assimp::Importer& importer, const std::string& path);
+Model* loadModel(const std::string& path);
 
 #endif

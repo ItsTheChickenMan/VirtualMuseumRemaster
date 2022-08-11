@@ -44,6 +44,7 @@ void main(){
 	vec3 baseColor = vec3(texture(texture1, TexCoords));
 	
 	vec3 final = vec3(0);
+	//final = baseColor;
 	
 	// calculate lighting
 	for(int i = 0; i < numPointLights; i++){

@@ -29,6 +29,9 @@ struct Scene {
 	// loaded textures
 	std::map<std::string, TextureData*>* textures;
 	
+	// models
+	std::map<std::string, Model*>* models;
+	
 	// objects
 	std::map<VertexData*, std::vector<TexturedRenderableObject*>*>* staticObjects;
 	
@@ -39,6 +42,7 @@ struct Scene {
 // world blocks (hold information about blocks)
 
 // texture block
+// also used by other blocks with 2 string parameters
 struct TextureBlock {
 	const static uint32_t numStrings = 2;
 	

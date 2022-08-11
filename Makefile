@@ -21,10 +21,10 @@ OBJ=$(patsubst %,$(OBJ_DIR)%,$(_OBJ))
 LIB=$(patsubst %,-L%,$(LIB_DIRS))
 
 # lib includes
-LIBS=-lglfw3 -lopengl32 -lsfml-audio-s -lsfml-system-s -lopenal32 -lFLAC -lvorbisfile -lvorbisenc -lvorbis -logg -lgdi32 -luser32 -lkernel32 -lwinmm
+LIBS=-lglfw3 -lopengl32 -lsfml-audio-s -lsfml-system-s -lopenal32 -lFLAC -lvorbisfile -lvorbisenc -lvorbis -logg -lgdi32 -lassimp.dll -luser32 -lkernel32 -lwinmm
 
 # compiler flags
-CFLAGS=-Werror
+CFLAGS=-Werror -g
 
 # make all targets
 .PHONY: all
@@ -32,8 +32,11 @@ all: $(INSTALL_DIR)$(OUT)
 
 # clean o files
 .PHONY: clean
-clean:
-	rm -rf $(OBJ_DIR)
+clean: clearobj all
+	
+.PHONY: clearobj
+clearobj:
+	@rm -rf $(OBJ_DIR)
 
 # main target
 $(INSTALL_DIR)$(OUT): $(OBJ) 
