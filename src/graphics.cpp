@@ -389,13 +389,12 @@ void renderRenderableObjectNoBind(RenderableObject* object, PerspectiveCamera* c
 }
 
 // create a mesh
-Mesh* createMesh(VertexData* vertexData, TextureData* texture){
+Mesh* createMesh(VertexData* vertexData, TextureData* texture, glm::vec3 color){
 	Mesh* mesh = allocateMemoryForType<Mesh>();
 	
-	//mesh->vertices = new std::vector<Vertex>();
-	//mesh->indices = new std::vector<uint32_t>();
 	mesh->vertexData = vertexData;
 	mesh->texture = texture;
+	mesh->color = color;
 	
 	return mesh;
 }
@@ -411,24 +410,36 @@ Model* createModel(){
 	return model;
 }
 
+#include <iostream>
+
 // process mesh into a Mesh struct
 void processMesh(aiMesh* aiMesh, const aiScene* scene, Model* model){
-	// vectors for vertex data and indices, and a spot for texture
+	// null checks
+	if(aiMesh == NULL || model == NULL) return;
+	
+	// vectors for vertex data and indices, and a spot for texture/color
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 	TextureData* texture = NULL;
+	glm::vec3 color = glm::vec3(0);
 	
 	// convert aiVector3Ds to glm::vec3s and create vertices
 	for(uint32_t i = 0; i < aiMesh->mNumVertices; i++){
 		aiVector3D aiPosition = aiMesh->mVertices[i];
-		aiVector3D aiNormals = aiMesh->mNormals[i];
 		
 		glm::vec3 position = glm::vec3(aiPosition.x, aiPosition.y, aiPosition.z);
-		glm::vec3 normal = glm::vec3(aiNormals.x, aiNormals.y, aiNormals.z);
+		
+		glm::vec3 normal = glm::vec3(1, 0, 0);
+		
+		if(aiMesh->HasNormals()){
+			aiVector3D aiNormals = aiMesh->mNormals[i];
+		
+			normal = glm::vec3(aiNormals.x, aiNormals.y, aiNormals.z);
+		}
 		
 		glm::vec2 textureCoords = glm::vec2(0);
 		
-		if(aiMesh->mTextureCoords[0]){
+		if(aiMesh->HasTextureCoords(0)){
 			textureCoords = glm::vec2(aiMesh->mTextureCoords[0][i].x, aiMesh->mTextureCoords[0][i].y);
 		}
 		
@@ -446,10 +457,19 @@ void processMesh(aiMesh* aiMesh, const aiScene* scene, Model* model){
 		}
 	}
 	
-	// load texture (if available and unloaded)
-	if(aiMesh->mMaterialIndex >= 0){
+	// if the mesh has vertex colors defined, use those
+	if(aiMesh->HasVertexColors(0)){
+		aiColor4D* colorSet = aiMesh->mColors[0];
+		
+		for(uint32_t i = 0; i < aiMesh->mNumVertices; i++){
+			aiColor4D aiColor = colorSet[i];
+			
+			color = glm::vec3(aiColor.r, aiColor.g, aiColor.b);
+		}
+	} else if(aiMesh->mMaterialIndex >= 0){ // ptherwise load texture (if available and unloaded)
 		aiMaterial* material = scene->mMaterials[aiMesh->mMaterialIndex];
 		
+		// get texture
 		if(material->GetTextureCount(aiTextureType_DIFFUSE) > 0){ 
 			// get path to texture
 			aiString aiRelativePath;
@@ -457,7 +477,7 @@ void processMesh(aiMesh* aiMesh, const aiScene* scene, Model* model){
 			material->GetTexture(aiTextureType_DIFFUSE, 0, &aiRelativePath);
 			
 			std::string relativePath(aiRelativePath.C_Str());
-				
+			
 			// check if texture is loaded
 			if(model->textures->find(relativePath) != model->textures->end()){
 				// exists
@@ -490,7 +510,7 @@ void processMesh(aiMesh* aiMesh, const aiScene* scene, Model* model){
 	VertexData* data = createVertexData(vertices, indices);
 	
 	// create mesh
-	Mesh* mesh = createMesh(data, texture);
+	Mesh* mesh = createMesh(data, texture, color);
 	
 	// push mesh to model
 	model->meshes->push_back(mesh);
@@ -532,7 +552,7 @@ void loadModels(std::vector<Model*>* models, std::string paths[], uint32_t numPa
 
 // load a model from a file
 Model* loadModel(Assimp::Importer& importer, const std::string& path){
-	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate/* | aiProcess_FlipUVs*/); // FIXME: flip uvs?
+	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_GenUVCoords/* | aiProcess_FlipUVs*/); // FIXME: flip uvs?
 	
 	if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode){
 		printf("error while loading model %s: %s\n", path.c_str(), importer.GetErrorString());

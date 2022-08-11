@@ -216,7 +216,11 @@ void setProgramExUniformTexture(ShaderProgramEx* programEx, const char* location
 	// bind texture to active texture
 	glActiveTexture(GL_TEXTURE0 + programEx->textureUnits);
 	
-	if(textureData) glBindTexture(GL_TEXTURE_2D, textureData->texture);
+	if(textureData){
+		glBindTexture(GL_TEXTURE_2D, textureData->texture);
+	} else {
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
 	
 	// assign active texture to uniform
 	glUniform1i(getProgramExUniformLocation(programEx, std::string(location)), programEx->textureUnits);

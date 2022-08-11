@@ -37,11 +37,14 @@ uniform int numPointLights;
 // texture
 uniform sampler2D texture1;
 
+// color (defined if no texture is defined)
+uniform vec3 color;
+
 vec3 calculatePointLightContribution(PointLight light);
 
 void main(){
 	// get texture sample
-	vec3 baseColor = vec3(texture(texture1, TexCoords));
+	vec3 baseColor = vec3(texture(texture1, TexCoords)) + color;
 	
 	vec3 final = vec3(0);
 	//final = baseColor;

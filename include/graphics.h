@@ -62,6 +62,7 @@ struct Mesh {
 	VertexData* vertexData;
 	
 	TextureData* texture; // TODO: multiple?
+	glm::vec3 color; // color if texture is null
 };
 
 // model
@@ -115,7 +116,7 @@ void renderRenderableObject(RenderableObject* object, PerspectiveCamera* camera,
 void renderRenderableObjectNoBind(RenderableObject* object, PerspectiveCamera* camera, ShaderProgramEx* programEx);
 
 // model management
-Mesh* createMesh(VertexData* vertexData, TextureData* texture);
+Mesh* createMesh(VertexData* vertexData, TextureData* texture, glm::vec3 color);
 Model* createModel();
 void loadModels(std::vector<Model*>* models, std::string paths[], uint32_t numPaths);
 Model* loadModel(Assimp::Importer& importer, const std::string& path);

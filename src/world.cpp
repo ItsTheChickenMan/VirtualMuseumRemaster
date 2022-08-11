@@ -13,6 +13,18 @@ TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* objec
 	
 	texturedObject->renderableObject = object;
 	texturedObject->textureData = texture;
+	texturedObject->color = glm::vec3(0);
+	
+	return texturedObject;
+}
+
+// creates a textured renderable object from an existing object and vec3 color
+TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, glm::vec3 color){
+	TexturedRenderableObject* texturedObject = allocateMemoryForType<TexturedRenderableObject>();
+	
+	texturedObject->renderableObject = object;
+	texturedObject->textureData = NULL;
+	texturedObject->color = color;
 	
 	return texturedObject;
 }
@@ -22,6 +34,13 @@ TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData,
 	RenderableObject* object = createRenderableObject(vertexData, position, rotation, scale);
 	
 	return createTexturedRenderableObject(object, texture);
+}
+
+// from new renderable object params and color
+TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, glm::vec3 color){
+	RenderableObject* object = createRenderableObject(vertexData, position, rotation, scale);
+	
+	return createTexturedRenderableObject(object, color);
 }
 
 // from existing renderable object and new texture data params
@@ -221,16 +240,16 @@ void objectBlockToScene(void** block, Scene* scene){
 	float y = objectBlock->floats->at(1);
 	float z = objectBlock->floats->at(2);
 	
-	float yaw = objectBlock->floats->at(3);
-	float pitch = objectBlock->floats->at(4);
-	float roll = objectBlock->floats->at(5);
+	float rx = objectBlock->floats->at(3);
+	float ry = objectBlock->floats->at(4);
+	float rz = objectBlock->floats->at(5);
 	
 	float w = objectBlock->floats->at(6);
 	float h = objectBlock->floats->at(7);
 	float d = objectBlock->floats->at(8);
 	
 	glm::vec3 position = glm::vec3(x, y, z);
-	glm::vec3 rotation = glm::vec3(yaw, pitch, roll);
+	glm::vec3 rotation = glm::vec3(glm::radians(rx), glm::radians(ry), glm::radians(rz));
 	glm::vec3 scale = glm::vec3(w, h, d);
 	
 	// check amount of strings
@@ -259,8 +278,14 @@ void objectBlockToScene(void** block, Scene* scene){
 				// create renderable object from mesh
 				RenderableObject* object = createRenderableObject(mesh->vertexData, position, rotation, scale);
 				
-				// create textured renderable object from renderable object and mesh
-				TexturedRenderableObject* texturedObject = createTexturedRenderableObject(object, mesh->texture);
+				// create textured renderable object from renderable object and texture/color
+				TexturedRenderableObject* texturedObject;
+				
+				if(mesh->texture){
+					texturedObject = createTexturedRenderableObject(object, mesh->texture);
+				} else {
+					texturedObject = createTexturedRenderableObject(object, mesh->color);
+				}
 				
 				// push to scene
 				std::vector<TexturedRenderableObject*>* objectVector = (*scene->staticObjects)[mesh->vertexData];

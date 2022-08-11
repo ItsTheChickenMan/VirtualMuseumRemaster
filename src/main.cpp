@@ -30,7 +30,10 @@ int main(){
 	printf("Creating window...");
 	
 	uint32_t screenWidth = 1280;
+	//uint32_t screenWidth = 800;
+	
 	uint32_t screenHeight = 720;
+	//uint32_t screenHeight = 600;
 	
 	Window* window = createWindow(screenWidth, screenHeight, "Virtual Museum Remastered");
 	
@@ -83,7 +86,7 @@ int main(){
 	printf("Done\nLoading scene...");
 	
 	// create camera
-	PerspectiveCamera* camera = createPerspectiveCamera(glm::vec3(-2.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::radians(45.f), (float)screenWidth, (float)screenHeight, 0.1f, 100.f);
+	PerspectiveCamera* camera = createPerspectiveCamera(glm::vec3(-2.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::radians(45.f), (float)screenWidth, (float)screenHeight, 0.1f, 100.f);
 
 	// create scene objects
 	//RenderableObject* object = createRenderableObject(cubeData, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, glm::radians(90.0f), 0.0f), glm::vec3(1.0f));
@@ -160,6 +163,8 @@ glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera){
 	}
 	
 	if(glm::length2(movementVector) != 0.0f) movementVector = glm::normalize(movementVector) * speed;
+	
+	movementVector.y = 0;
 	
 	return movementVector;
 }

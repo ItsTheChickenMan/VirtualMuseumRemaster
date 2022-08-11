@@ -16,6 +16,7 @@
 // textured renderable object
 struct TexturedRenderableObject {
 	TextureData* textureData;
+	glm::vec3 color; // color if texture data is null
 	
 	RenderableObject* renderableObject;
 };
@@ -103,7 +104,9 @@ struct LightBlock {
 
 // methods //
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, TextureData* texture);
+TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, glm::vec3 color);
 TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, TextureData* texture);
+TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, glm::vec3 color);
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, const char* texturePath);
 TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, const char* texturePath);
 

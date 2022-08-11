@@ -13,9 +13,10 @@ void renderTexturedRenderableObject(TexturedRenderableObject* texturedRenderable
 	// bind texture
 	TextureData* textureData = texturedRenderableObject->textureData;
 	
-	// FIXME: no render for no textures?
-	if(!textureData) return;
+	// set color
+	glUniform3fv(getProgramExUniformLocation(programEx, "color"), 1, glm::value_ptr(texturedRenderableObject->color));
 	
+	// set texture
 	setProgramExUniformTexture(programEx, "texture1", textureData);
 	
 	// render
@@ -34,9 +35,10 @@ void renderTexturedRenderableObjectNoBind(TexturedRenderableObject* texturedRend
 	// bind texture
 	TextureData* textureData = texturedRenderableObject->textureData;
 	
-	// FIXME: no render for no textures?
-	if(!textureData) return;
+	// set color
+	glUniform3fv(getProgramExUniformLocation(programEx, "color"), 1, glm::value_ptr(texturedRenderableObject->color));
 	
+	// set texture
 	setProgramExUniformTexture(programEx, "texture1", textureData);
 	
 	// render

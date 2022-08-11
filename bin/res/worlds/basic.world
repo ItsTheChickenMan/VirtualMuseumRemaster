@@ -4,7 +4,8 @@
 # blocks are any chars enclosed by two brackets and a delimiter character.  here are all valid blocks (* = optional):
 
 # %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
-# *[shapeName/modelPath, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block.  NOTE: if this can't find shapeName in shapes.h, it will assume it is a path to a model and load it with assimp
+# *[shapeName, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
+# +[modelPath, modelName] = a special use block for initializing models.  models need to be loaded and given names in order to be referenced by other blocks, so this block should exist 
 # $[x, y, z, y, p, r, w, h, d, *textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (not required if using a model, which load their own textures), and vertex data (or default)
 # &[x, y, z, r, g, b, c, l, q, ambientStrength, diffuseStrength] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), constant+linear+quadratic values for attenuation (c,l,q), and ambient + diffuse strength
 
@@ -36,26 +37,30 @@
 +[./res/models/Avocado.glb, avocado]
 +[./res/models/SmilingFace.glb, smiley]
 +[./res/models/CesiumMan.glb, man]
++[./res/models/archway.glb, archway]
 
 # object blocks
 
 # enclosure
-$[0, 0, 0,    0, 0, 0,    10, 1, 10,    floor,    cube]
-$[0, 11, 0,    0, 0, 0,    10, 1, 10,    wall,    cube]
+$[0, 0, 0,    0, 0, 0,    12, 1, 10,    floor,    cube]
+$[0, 11, 0,    0, 0, 0,    12, 1, 10,    wall,    cube]
+
 $[5.5, 5.5, 0,    0, 0, 0,    1, 10, 10,   wall,    cube]
 $[-5.5, 5.5, 0,    0, 0, 0,    1, 10, 10,   wall,    cube]
 $[0, 5.5, 5.5,    0, 0, 0,    10, 10, 1,   wall,    cube]
-$[0, 5.5, -5.5,    0, 0, 0,    10, 10, 1,   wall,    cube]
+
+# archway wall
+$[-3.75, 5.5, -4.5,    0, 0, 0,    2.5, 10, 1,   wall,    cube]
+$[3.75, 5.5, -4.5,    0, 0, 0,    2.5, 10, 1,   wall,    cube]
+$[0, 9.5, -4.5,    0, 0, 0,    5, 2, 1,   wall,    cube]
 
 # fun little cubes
-$[0, 1, 0,     0, 0, 0,    0.2, 0.2, 0.2,    avocado]
-$[2, 2, 0,     0, 0, 0,    1, 1, 1,    smiley]
-$[4, 3, 1,     -1.57, 3.14, 0,    3, 3, 3,    man]
+$[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
+$[-4, 1.5, 1,     0, 90, 0,    1, 1, 1,    smiley]
+$[4, 0.65, 1,     -90, 180, 0,    3, 3, 3,    man]
+
+$[0, 4.5, -4.5,     -90, 0, 0,    1, 1, 1,    archway]
 
 # light blocks
 
-&[0, 7, 0,    1, 1, 1,    1.0, 0.027, 0.0028,    0.15, 1]
-&[3, 3, 3,    1, 0, 0.1,    1.0, 0.35, 0.44,    0, 1]
-&[-1, 1, 2,    0.3, 1, 0,    1.0, 0.14, 0.07,    0, 1]
-&[-4.5, 2, -4.5,    0, 0.1, 1,    1.0, 0.14, 0.07,    0, 1]
-&[-2, 2, -2,    1, 0.1, 1,    1.0, 0.027, 0.0028,    0, 1]
+&[0, 3, 0,     1, 1, 1,    1, 0.072, 0.0175,     0.4, 0.8]
