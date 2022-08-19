@@ -81,6 +81,9 @@ vec3 calculatePointLightContribution(PointLight light){
 	// only attenuate diffuse light
 	diffuse *= attenuation;
 	
+	// apply diffuse factor
+	diffuse *= light.diffuseStrength;
+	
 	// calculate total contribution
 	vec3 contribution = light.color * (ambient+diffuse);
 	

@@ -21,6 +21,19 @@ struct TexturedRenderableObject {
 	RenderableObject* renderableObject;
 };
 
+// 2d bounding box struct
+struct BoundingBox {
+	// position and size
+	glm::vec3 position;
+	glm::vec2 size;
+	
+	// corners
+	glm::vec2 UL, UR, BL, BR;
+	
+	// adjacent bounding box indexes
+	std::vector<uint32_t>* adjacent;
+};
+
 // scene
 // contain static renderable objects
 struct Scene {
@@ -38,62 +51,17 @@ struct Scene {
 	
 	// lights
 	std::vector<PointLight*>* pointLights;
+	
+	// walkmap
+	std::vector<BoundingBox*>* walkmap;
 };
 
-// world blocks (hold information about blocks)
-
-// texture block
-// also used by other blocks with 2 string parameters
-struct TextureBlock {
-	const static uint32_t numStrings = 2;
-	
-	// vector of string parameters
+struct Block {
+	// vector for string parameters
 	std::vector<std::string>* strings;
 	
-	// index of string parameter being written to
-	uint32_t parameterIndex;
-	
-	// string buffer for parameter
-	std::string* parameterBuffer;
-};
-
-// vertex data block
-struct VertexDataBlock {
-	const static uint32_t numStrings = 2;
-	
-	// vector of string parameters
-	std::vector<std::string>* strings;
-	
-	// index of string parameter being written to
-	uint32_t parameterIndex;
-	
-	// string buffer for parameter
-	std::string* parameterBuffer;
-};
-
-// object block
-struct ObjectBlock {
-	const static uint32_t numFloats = 9;
-	const static uint32_t numStrings = 2;
-	
-	// vector of float parameters
-	std::vector<float>* floats;
-	
-	// vector of string parameters
-	std::vector<std::string>* strings;
-	
-	// index of parameter being written to
-	uint32_t parameterIndex;
-	
-	// string buffer for parameter
-	std::string* parameterBuffer;
-};
-
-struct LightBlock {
-	const static uint32_t numFloats = 11;
-	
-	// vector of float parameters
-	std::vector<float>* floats;
+	// vector for num parameters (always floats)
+	std::vector<float>* numbers;
 	
 	// index of parameter being written to
 	uint32_t parameterIndex;
@@ -110,7 +78,12 @@ TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData,
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, const char* texturePath);
 TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, const char* texturePath);
 
+BoundingBox* createBbox(glm::vec2 p, glm::vec2 s);
+BoundingBox* createBbox(glm::vec3 p, glm::vec2 s);
+BoundingBox* createBbox(BoundingBox* original);
+
 Scene* createScene();
+void parseWorldIntoScene(Scene* scene, const char* file);
 Scene* parseWorld(const char* file);
 
 #endif

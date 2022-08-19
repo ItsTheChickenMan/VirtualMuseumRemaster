@@ -23,3 +23,10 @@ char* read_entire_file(const char* file)
 	buffer[src_size] = 0;
 	return buffer;
 }
+
+// https://stackoverflow.com/a/16575025
+bool isStringNumber(std::string& str){
+	char* p;
+	strtod(str.c_str(), &p);
+	return *p == 0;
+}

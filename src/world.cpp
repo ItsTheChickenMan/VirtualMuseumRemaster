@@ -5,6 +5,8 @@
 
 #include <cctype>
 
+#include <stdexcept>
+
 // textured object constructors
 
 // creates a textured renderable object from an existing object and an existing texture data
@@ -58,6 +60,48 @@ TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData,
 	return createTexturedRenderableObject(object, texture);
 }
 
+// bounding box constructors
+
+// create bounding box with 2d position
+BoundingBox* createBbox(glm::vec2 p, glm::vec2 s){
+	return createBbox(glm::vec3(p.x, 0, p.y), s);
+}
+
+// create bounding box with 3d position
+BoundingBox* createBbox(glm::vec3 p, glm::vec2 s){
+	// create 2d corners
+	glm::vec2 UL = glm::vec2( (p.x-s.x/2.f), (p.z-s.y/2.f) );
+	glm::vec2 UR = glm::vec2( (p.x+s.x/2.f), (p.z-s.y/2.f) );
+	glm::vec2 BL = glm::vec2( (p.x-s.x/2.f), (p.z+s.y/2.f) );
+	glm::vec2 BR = glm::vec2( (p.x+s.x/2.f), (p.z+s.y/2.f) );
+	
+	// allocate space for box
+	BoundingBox* box = allocateMemoryForType<BoundingBox>();
+	box->position = p;
+	box->size = s;
+	
+	box->UL = UL;
+	box->UR = UR;
+	box->BL = BL;
+	box->BR = BR;
+	
+	box->adjacent = new std::vector<uint32_t>();
+	
+	return box;
+}
+
+// copy bbox (but doesn't copy adjacent)
+BoundingBox* createBbox(BoundingBox* original){
+	return createBbox(original->position, original->size);
+}
+
+// destroy a bbox
+void destroyBbox(BoundingBox* b){
+	delete b->adjacent;
+	
+	free(b);
+}
+
 // world
 
 // parser settings
@@ -70,196 +114,137 @@ const char vertexDataBlockDelimiter = '*';
 const char objectBlockDelimiter = '$';
 const char lightBlockDelimiter = '&';
 const char modelBlockDelimiter = '+';
+const char walkBoxBlockDelimiter = '~';
 
-// texture char parser	
-bool textureBlockCharParser(void** block, char byte){	
-	// cast pointer to block type
-	TextureBlock* textureBlock = (TextureBlock*)(*block);
+// create a block
+Block* createBlock(){
+	Block* block = allocateMemoryForType<Block>();
 	
+	// construct members
+	block->strings = new std::vector<std::string>();
+	block->numbers = new std::vector<float>();
+	block->parameterBuffer = new std::string();
+	
+	block->parameterIndex = 0;
+	
+	return block;
+}
+
+// empties out buffers and vectors, but keeps memory allocated
+void emptyBlock(Block* block){
+	// erase parameter buffer
+	block->parameterBuffer->clear();
+	
+	// empty vectors
+	block->strings->clear();
+	block->numbers->clear();
+	
+	// reset parameter index
+	block->parameterIndex = 0;
+}
+
+// completely deletes occupied memory
+void destroyBlock(Block* block){
+	// destruct members
+	delete block->strings;
+	delete block->numbers;
+	delete block->parameterBuffer;
+	
+	free(block);
+}
+
+// block char parser
+bool blockCharParser(Block* block, char byte){
 	// ensure that block exists, create it if it doesn't
-	if(*block == NULL){
-		textureBlock = allocateMemoryForType<TextureBlock>();
-		
-		// construct members
-		textureBlock->strings = new std::vector<std::string>();
-		textureBlock->parameterIndex = 0;
-		textureBlock->parameterBuffer= new std::string();
-		
-		// point block to created textureBlock
-		*block = (void*)textureBlock;
-		
-		// because this should be created on the first byte, we can safely exit here to avoid the open bracket being included
+	if(block == NULL){
+		// weird problem, give up
 		return false;
 	}
 	
-	// parse byte
-	
 	// add byte to parameter buffer if it's not equal to the parameter delimiter or the close block
 	if(byte != parameterDelimiter && byte != blockClose){
-		textureBlock->parameterBuffer->push_back(byte);
+		block->parameterBuffer->push_back(byte);
 	} else {
 		// flush parameter buffer
-		textureBlock->strings->push_back( *textureBlock->parameterBuffer ); // push_back constructs a copy, so there shouldn't be anything to worry about here
+		if(isStringNumber( *block->parameterBuffer )){
+			block->numbers->push_back( std::stof(*block->parameterBuffer) );
+		} else {
+			block->strings->push_back( *block->parameterBuffer );
+		}
 		
 		// reset parameterBuffer
-		textureBlock->parameterBuffer->erase(0, std::string::npos);
+		block->parameterBuffer->clear();
 		
 		// if parameterIndex is at the maximum value, return true (done)
-		if(textureBlock->parameterIndex+1 == TextureBlock::numStrings){
+		if(byte == blockClose){
 			// block is done parsing
 			return true;
 		}
 		
 		// otherwise, increment parameterIndex
-		textureBlock->parameterIndex++;
+		block->parameterIndex++;
 	}
 	
 	return false;
 }
 
-void textureBlockToScene(void** block, Scene* scene){
-	// cast block to block type
-	TextureBlock* textureBlock = (TextureBlock*)(*block);
-	
+// block to scene methods
+void textureBlockToScene(Block* block, Scene* scene){
 	// load values
-	std::string texturePath = textureBlock->strings->at(0);
-	std::string textureName = textureBlock->strings->at(1);
+	std::string texturePath = block->strings->at(0);
+	std::string textureName = block->strings->at(1);
 	
 	// load texture
 	(*scene->textures)[textureName] = createTextureData(texturePath.c_str());
-	
-	// delete contents of block
-	// remove the parameter buffer
-	delete textureBlock->parameterBuffer;
-	
-	// delete the parameters object
-	delete textureBlock->strings;
-	
-	// free memory
-	free(textureBlock);
-	
-	*block = NULL;
 }
 
-// no vertex data block parser bc it uses the TextureBlock struct
-
-void vertexDataBlockToScene(void** block, Scene* scene){
-	// cast block to block type
-	TextureBlock* vertexDataBlock = (TextureBlock*)(*block);
-	
+void vertexDataBlockToScene(Block* block, Scene* scene){
 	// load values
-	std::string shapeName = vertexDataBlock->strings->at(0);
-	std::string vertexDataName = vertexDataBlock->strings->at(1);
+	std::string shapeName = block->strings->at(0);
+	std::string vertexDataName = block->strings->at(1);
 	
 	// load vertex data
 	VertexDataInfo info = g_shapes[shapeName];
 	
 	(*scene->vertexData)[vertexDataName] = createVertexData(info.vertices, info.vertexCount, info.sizeInBytes, info.componentOrder, info.numComponents);
-	
-	// delete contents of block
-	// remove the parameter buffer
-	delete vertexDataBlock->parameterBuffer;
-	
-	// delete the parameters object
-	delete vertexDataBlock->strings;
-	
-	// free memory
-	free(vertexDataBlock);
-	
-	*block = NULL;
 }
 
-bool objectBlockCharParser(void** block, char byte){
-	// cast pointer to block type
-	ObjectBlock* objectBlock = (ObjectBlock*)(*block);
-	
-	// ensure that block exists, create it if it doesn't
-	if(*block == NULL){
-		objectBlock = allocateMemoryForType<ObjectBlock>();
-		
-		// construct members
-		objectBlock->floats = new std::vector<float>();
-		objectBlock->strings = new std::vector<std::string>();
-		objectBlock->parameterIndex = 0;
-		objectBlock->parameterBuffer= new std::string();
-		
-		// point block to created textureBlock
-		*block = (void*)objectBlock;
-		
-		// because this should be created on the first byte, we can safely exit here to avoid the open bracket being included
-		return false;
-	}
-	
-	// parse char (if it's not the delimiter or block close)
-	if(byte != parameterDelimiter && byte != blockClose){
-		// push to parameter buffer
-		objectBlock->parameterBuffer->push_back(byte);
-	} else {
-		// flush parameter buffer
-		
-		// check what we're parsing
-		if(objectBlock->parameterIndex < ObjectBlock::numFloats){
-			// if parsing floats, convert the buffer to a float and push to floats
-			float floatParameter = std::stof(*objectBlock->parameterBuffer);
-			
-			// push to floats buffer
-			objectBlock->floats->push_back(floatParameter);
-			
-			// reset parameterBuffer
-			objectBlock->parameterBuffer->erase(0, std::string::npos);
-		
-			// increment parameter index
-			objectBlock->parameterIndex++;
-		} else if(objectBlock->parameterIndex < ObjectBlock::numFloats+ObjectBlock::numStrings){
-			// if parsing strings, just push the string to strings
-			objectBlock->strings->push_back(*objectBlock->parameterBuffer);
-			
-			// reset parameterBuffer
-			objectBlock->parameterBuffer->erase(0, std::string::npos);
-			
-			// check if this is the end
-			if(objectBlock->parameterIndex+1 == ObjectBlock::numFloats+ObjectBlock::numStrings || byte == blockClose){
-				// last argument reached, return true to indicate that we're done parsing
-				return true;
-			}
-			
-			// increment parameter index
-			objectBlock->parameterIndex++;
-		}
-	}
-	
-	return false;
-}
-
-void objectBlockToScene(void** block, Scene* scene){
-	// cast pointer to block type
-	ObjectBlock* objectBlock = (ObjectBlock*)(*block);
-	
+void objectBlockToScene(Block* block, Scene* scene){
 	// load some float values
-	float x = objectBlock->floats->at(0);
-	float y = objectBlock->floats->at(1);
-	float z = objectBlock->floats->at(2);
+	if(block->numbers->size() < 9){
+		printf("Not enough enough parameters in an object block (only %d numbers and %d strings present)\n", block->numbers->size(), block->strings->size());
+		return;
+	}
 	
-	float rx = objectBlock->floats->at(3);
-	float ry = objectBlock->floats->at(4);
-	float rz = objectBlock->floats->at(5);
+	float x = block->numbers->at(0);
+	float y = block->numbers->at(1);
+	float z = block->numbers->at(2);
 	
-	float w = objectBlock->floats->at(6);
-	float h = objectBlock->floats->at(7);
-	float d = objectBlock->floats->at(8);
+	float rx = block->numbers->at(3);
+	float ry = block->numbers->at(4);
+	float rz = block->numbers->at(5);
+	
+	float w = block->numbers->at(6);
+	float h = block->numbers->at(7);
+	float d = block->numbers->at(8);
 	
 	glm::vec3 position = glm::vec3(x, y, z);
 	glm::vec3 rotation = glm::vec3(glm::radians(rx), glm::radians(ry), glm::radians(rz));
 	glm::vec3 scale = glm::vec3(w, h, d);
 	
 	// check amount of strings
-	uint32_t stringParams = objectBlock->strings->size();
+	uint32_t stringParams = block->strings->size();
 	
 	// mode depends on number of string parameters (1 = model, 2 = texture + vertexData)
 	switch(stringParams){
+		case 0: {
+			printf("There weren't enough string parameters in an object block (only %d present)\n", block->strings->size());
+			return;
+		}
+		
 		case 1: {
 			// load values
-			std::string modelName = objectBlock->strings->at(0);
+			std::string modelName = block->strings->at(0);
 			
 			// load model
 			Model* model = (*scene->models)[modelName];
@@ -303,8 +288,8 @@ void objectBlockToScene(void** block, Scene* scene){
 		}
 		case 2: {
 			// load values
-			std::string textureName = objectBlock->strings->at(0);
-			std::string vertexDataName = objectBlock->strings->at(1);
+			std::string textureName = block->strings->at(0);
+			std::string vertexDataName = block->strings->at(1);
 			
 			// check texture
 			TextureData* texture = (*scene->textures)[textureName];
@@ -312,7 +297,7 @@ void objectBlockToScene(void** block, Scene* scene){
 			if(!texture){
 				printf("Invalid texture name %s", textureName.c_str());
 				
-				TextureData* def = scene->textures->at("default");
+				TextureData* def = (*scene->textures)["default"];
 				
 				if(def){
 					texture = def;
@@ -350,90 +335,30 @@ void objectBlockToScene(void** block, Scene* scene){
 			break;
 		}
 	}
-	
-	// delete contents of block
-	// remove the parameter buffer
-	delete objectBlock->parameterBuffer;
-	
-	// delete the parameters objects
-	delete objectBlock->floats;
-	delete objectBlock->strings;
-	
-	// free memory
-	free(objectBlock);
-	
-	*block = NULL;
 }
 
-bool lightBlockCharParser(void** block, char byte){
-	// cast pointer to block type
-	LightBlock* lightBlock = (LightBlock*)(*block);
-	
-	// ensure that block exists, create it if it doesn't
-	if(*block == NULL){
-		lightBlock = allocateMemoryForType<LightBlock>();
-		
-		// construct members
-		lightBlock->floats = new std::vector<float>();
-		lightBlock->parameterIndex = 0;
-		lightBlock->parameterBuffer= new std::string();
-		
-		// point block to created lightBlock
-		*block = (void*)lightBlock;
-		
-		// because this should be created on the first byte, we can safely exit here to avoid the open bracket being included
-		return false;
-	}
-	
-	// parse byte
-	
-	// add byte to parameter buffer if it's not equal to the parameter delimiter or the close block
-	if(byte != parameterDelimiter && byte != blockClose){
-		lightBlock->parameterBuffer->push_back(byte);
-	} else {
-		// flush parameter buffer
-		
-		// if parsing floats, convert the buffer to a float and push to floats
-		float floatParameter = std::stof(*lightBlock->parameterBuffer);
-		
-		// push to floats buffer
-		lightBlock->floats->push_back(floatParameter);
-		
-		// reset parameterBuffer
-		lightBlock->parameterBuffer->erase(0, std::string::npos);
-		
-		// if parameterIndex is at the maximum value, return true (done)
-		if(lightBlock->parameterIndex+1 == LightBlock::numFloats){
-			// block is done parsing
-			return true;
-		}
-		
-		// otherwise, increment parameterIndex
-		lightBlock->parameterIndex++;
-	}
-	
-	return false;
-}
-
-void lightBlockToScene(void** block, Scene* scene){
-	// cast block to block type
-	LightBlock* lightBlock = (LightBlock*)(*block);
-	
+void lightBlockToScene(Block* block, Scene* scene){
 	// load values
-	float x = lightBlock->floats->at(0);
-	float y = lightBlock->floats->at(1);
-	float z	= lightBlock->floats->at(2);
 	
-	float r = lightBlock->floats->at(3);
-	float g = lightBlock->floats->at(4);
-	float b = lightBlock->floats->at(5);
+	if(block->numbers->size() < 11){
+		printf("Not enough parameters for light block (only %d numbers present)\n", block->numbers->size());
+		return;
+	}
 	
-	float c = lightBlock->floats->at(6);
-	float l = lightBlock->floats->at(7);
-	float q = lightBlock->floats->at(8);
+	float x = block->numbers->at(0);
+	float y = block->numbers->at(1);
+	float z	= block->numbers->at(2);
 	
-	float as = lightBlock->floats->at(9);
-	float ds = lightBlock->floats->at(10);
+	float r = block->numbers->at(3);
+	float g = block->numbers->at(4);
+	float b = block->numbers->at(5);
+	
+	float c = block->numbers->at(6);
+	float l = block->numbers->at(7);
+	float q = block->numbers->at(8);
+	
+	float as = block->numbers->at(9);
+	float ds = block->numbers->at(10);
 	
 	glm::vec3 position = glm::vec3(x, y, z);
 	glm::vec3 color = glm::vec3(r, g, b);
@@ -443,27 +368,13 @@ void lightBlockToScene(void** block, Scene* scene){
 	
 	// add to scene
 	scene->pointLights->push_back(light);
-	
-	// delete contents of block
-	// remove the parameter buffer
-	delete lightBlock->parameterBuffer;
-	
-	// delete the parameters object
-	delete lightBlock->floats;
-	
-	// free memory
-	free(lightBlock);
-	
-	*block = NULL;
 }
 
-void modelBlockToScene(void** block, Scene* scene){
-	// cast block to block type
-	TextureBlock* modelBlock = (TextureBlock*)(*block);
-	
+// uses textureBlockCharParser
+void modelBlockToScene(Block* block, Scene* scene){
 	// load values
-	std::string path = modelBlock->strings->at(0);
-	std::string modelName = modelBlock->strings->at(1);
+	std::string path = block->strings->at(0);
+	std::string modelName = block->strings->at(1);
 	
 	// load model
 	Model* model = loadModel(path);
@@ -473,18 +384,35 @@ void modelBlockToScene(void** block, Scene* scene){
 	}
 	
 	(*scene->models)[modelName] = model;
+}
+
+// uses lightBlockCharParser
+void walkBoxBlockToScene(Block* block, Scene* scene){
+	// load values
+	float x = block->numbers->at(0);
+	float y = block->numbers->at(1);
+	float z	= block->numbers->at(2);
 	
-	// delete contents of block
-	// remove the parameter buffer
-	delete modelBlock->parameterBuffer;
+	float w = block->numbers->at(3);
+	float d = block->numbers->at(4);
 	
-	// delete the parameters object
-	delete modelBlock->strings;
+	glm::vec3 position = glm::vec3(x, y, z);
+	glm::vec2 size = glm::vec2(w, d);
 	
-	// free memory
-	free(modelBlock);
+	// create bounding box
+	BoundingBox* box = createBbox(position, size);
 	
-	*block = NULL;
+	// add adjacents
+	for(uint32_t i = 5; i < block->numbers->size(); i++){
+		// convert float to int index
+		uint32_t index = (uint32_t)block->numbers->at(i);
+		
+		// add index to box adjacents
+		box->adjacent->push_back(index);
+	}
+	
+	// add to scene
+	scene->walkmap->push_back(box);
 }
 
 // create the shell of a scene
@@ -498,38 +426,35 @@ Scene* createScene(){
 	scene->models = new std::map<std::string, Model*>();
 	scene->staticObjects = new std::map<VertexData*, std::vector<TexturedRenderableObject*>*>();
 	scene->pointLights = new std::vector<PointLight*>();
+	scene->walkmap = new std::vector<BoundingBox*>();
 	
 	return scene;
 }
 
-// parse world
-Scene* parseWorld(const char* file){
+// parse a world file into an existing scene
+void parseWorldIntoScene(Scene* scene, const char* file){
 	// file buffer
 	char* fileBuffer = read_entire_file(file);
 	
 	if(fileBuffer == NULL){
 		printf("Invalid path for world %s\n", file);
-		return NULL;
+		return;
 	}
 	
-	// created scene
-	Scene* scene = createScene();
-	
 	// settings
-	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter};
+	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter, walkBoxBlockDelimiter};
 	
 	// control states
 	bool parsingBlock = false;
 	bool ignoringUntilNextLine = false;
 	int32_t blockParsing = -1;
-	void* blockBuffer = NULL;
+	Block* blockBuffer = createBlock();
 	
 	// pointers to char parsers
 	// first param = pointer to block (void* here to be valid for all pointers)
 	// second param = char to parse
 	// returns false if the block hasn't finished parsing and true if it has
-	bool (*charParsers[5])(void**,char) {textureBlockCharParser, textureBlockCharParser, objectBlockCharParser, lightBlockCharParser, textureBlockCharParser};
-	void (*blockParsers[5])(void**,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene};
+	void (*blockParsers[6])(Block*,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene, walkBoxBlockToScene};
 	
 	// loop through each byte
 	char byte;
@@ -573,6 +498,10 @@ Scene* parseWorld(const char* file){
 			for(int32_t i = 0; i < sizeof(blockDelimiters)/sizeof(char); i++){
 				if(byte == blockDelimiters[i]){
 					blockParsing = i;
+					
+					// skip block open
+					byteIndex++;
+					
 					break;
 				}
 			}
@@ -581,19 +510,30 @@ Scene* parseWorld(const char* file){
 		}
 		
 		// if a block is being parsed, pass the byte to the block parser function
-		bool done = (*charParsers[blockParsing])(&blockBuffer, byte);
+		bool done = blockCharParser(blockBuffer, byte);
 		
 		if(done){
 			// parse block into scene
-			(*blockParsers[blockParsing])(&blockBuffer, scene);
+			(*blockParsers[blockParsing])(blockBuffer, scene);
 			
 			// reset block parsing (blockBuffer is freed by block parser when done)
 			blockParsing = -1;
-			blockBuffer = NULL;
+			
+			// empty the block
+			emptyBlock(blockBuffer);
 		}
 	} while( byte != 0 ); // end at null terminator
 	
 	free(fileBuffer);
+	
+	destroyBlock(blockBuffer);
+}
+
+// parse world
+Scene* parseWorld(const char* file){
+	Scene* scene = createScene();
+	
+	parseWorldIntoScene(scene, file);
 	
 	return scene;
 }

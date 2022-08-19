@@ -5,7 +5,7 @@
 
 # %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
 # *[shapeName, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
-# +[modelPath, modelName] = a special use block for initializing models.  models need to be loaded and given names in order to be referenced by other blocks, so this block should exist 
+# +[modelPath, modelName, w, h, d] = a special use block for initializing models.  models need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block.  the (w,h,d) parameters are for bounding box size, but only need to be defined if using walkmaps (the full scale .world parser does not require these values)
 # $[x, y, z, y, p, r, w, h, d, *textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (not required if using a model, which load their own textures), and vertex data (or default)
 # &[x, y, z, r, g, b, c, l, q, ambientStrength, diffuseStrength] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), constant+linear+quadratic values for attenuation (c,l,q), and ambient + diffuse strength
 
@@ -25,8 +25,8 @@
 # texture initialization blocks
 
 %[./res/textures/default.png, default]
-%[./res/textures/greyfloor.png, floor]
-%[./res/textures/wall.png, wall]
+%[./res/textures/oldmuseum/greyfloor.png, floor]
+%[./res/textures/oldmuseum/wall.png, wall]
 
 # vertex data initialization blocks
 

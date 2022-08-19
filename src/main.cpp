@@ -12,7 +12,7 @@
 glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera);
 glm::vec3 calculateRotationVector();
 
-int main(){
+int main(int argc, char** argv){
 	// init //
 	
 	// set stdout buffer flushed without buffering, because line buffering doesn't work in msys2 terminal
@@ -86,14 +86,30 @@ int main(){
 	printf("Done\nLoading scene...");
 	
 	// create camera
-	PerspectiveCamera* camera = createPerspectiveCamera(glm::vec3(-2.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::radians(45.f), (float)screenWidth, (float)screenHeight, 0.1f, 100.f);
+	PerspectiveCamera* camera = createPerspectiveCamera(glm::vec3(-2.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::radians(45.f), (float)screenWidth, (float)screenHeight, 0.1f, 100.f * 5);
 
 	// create scene objects
 	//RenderableObject* object = createRenderableObject(cubeData, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, glm::radians(90.0f), 0.0f), glm::vec3(1.0f));
 	
-	Scene* scene = parseWorld("./res/worlds/basic.world");
+	const char* path = argc >= 2 ? argv[1] : "./res/worlds/basic.world";
+	const char* walkmapPath = argc >= 3 ? argv[2] : NULL;
 	
-	printf("Done\nRender Loop Starting\n");
+	// parse world
+	Scene* scene = parseWorld(path);
+	
+	if(walkmapPath){
+		parseWorldIntoScene(scene, walkmapPath);
+	}
+	
+	printf("Done\nWalkmap:\n");
+	
+	for(uint32_t i = 0; i < scene->walkmap->size(); i++){
+		BoundingBox* box = scene->walkmap->at(i);
+		
+		printf("%d: (p: %f, %f, %f, s: %f, %f) adjacents: %d\n", i, box->position.x, box->position.y, box->position.z, box->size.x, box->size.y, box->adjacent->size());
+	}
+	
+	//printf("Done\nRender Loop Starting\n");
 	
 	// render loop //
 	while(!shouldWindowClose(window)){
@@ -139,7 +155,7 @@ glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera){
 	
 	glm::vec3 directions[] = {camera->forward, side * -1.f, camera->forward * -1.f, side, camera->up, camera->up * -1.f};
 	
-	float speed = 0.1f;
+	float speed = 0.05f;
 	
 	if(glfwGetKey(window->glfwWindow, GLFW_KEY_E) == GLFW_PRESS){
 		speed /= 3.0f;
