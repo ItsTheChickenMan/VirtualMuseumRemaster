@@ -54,6 +54,12 @@ struct Scene {
 	
 	// walkmap
 	std::vector<BoundingBox*>* walkmap;
+	
+	// settings
+	float playerHeight;
+	float playerRadius;
+	float stepHeight;
+	float maxPlayerSpeed;
 };
 
 struct Block {
@@ -85,5 +91,6 @@ BoundingBox* createBbox(BoundingBox* original);
 Scene* createScene();
 void parseWorldIntoScene(Scene* scene, const char* file);
 Scene* parseWorld(const char* file);
+bool hasWalkmap(Scene* scene);
 
 #endif

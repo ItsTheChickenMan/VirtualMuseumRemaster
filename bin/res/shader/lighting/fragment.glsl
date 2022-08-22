@@ -71,6 +71,7 @@ vec3 calculatePointLightContribution(PointLight light){
 	float distance = length(lightRay); // used for attenuation
 	lightRay = normalize(lightRay);
 	
+	//float diffuse = max(dot(Normal, lightRay), 0);
 	float diffuse = max(dot(Normal, lightRay), 0);
 	//float diffuse = dot(Normal, lightRay);
 	//float diffuse = abs(dot(Normal, lightRay)); // fun line

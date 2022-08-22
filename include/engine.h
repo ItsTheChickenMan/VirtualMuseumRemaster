@@ -13,13 +13,6 @@
 #include <utils.h>
 #include <world.h>
 
-// structs //
-struct Player {
-	PerspectiveCamera* camera;
-	
-	int32_t keymap[];
-};
-
 // methods //
 void renderTexturedRenderableObject(TexturedRenderableObject* texturedRenderableObject, PerspectiveCamera* camera, ShaderProgramEx* programEx);
 void renderTexturedRenderableObjectNoBind(TexturedRenderableObject* texturedRenderableObject, PerspectiveCamera* camera, ShaderProgramEx* programEx);

@@ -74,4 +74,6 @@ void constrainCameraRotation(PerspectiveCamera *camera, glm::vec3 lowerBounds, g
 		
 		camera->rotation[i] = std::clamp(camera->rotation[i], lowerBound, upperBound);
 	}
+	
+	updateCameraViewMatrix(camera);
 }

@@ -1,11 +1,12 @@
 // remaster of the virtual museum I made for history about a year ago
 
 #include <engine.h>
+#include <world.h>
+#include <walkmap.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
-#include <world.h>
 
 #include <glm/gtx/norm.hpp>
 
@@ -86,8 +87,10 @@ int main(int argc, char** argv){
 	printf("Done\nLoading scene...");
 	
 	// create camera
-	PerspectiveCamera* camera = createPerspectiveCamera(glm::vec3(-2.0f, 2.5f, 0.0f), glm::vec3(0.0f), glm::radians(45.f), (float)screenWidth, (float)screenHeight, 0.1f, 100.f * 5);
-
+	// -6.594845, 5.227420, -4.362258, -0.564000, 0.656000, 0.000000
+	// 8.823283, 7.303828, 8.691005, -0.615999, 3.887995, 0.000000
+	PerspectiveCamera* camera = createPerspectiveCamera(glm::vec3(0), glm::vec3(0), glm::radians(45.f), (float)screenWidth, (float)screenHeight, 0.1f, 100.f);
+	
 	// create scene objects
 	//RenderableObject* object = createRenderableObject(cubeData, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, glm::radians(90.0f), 0.0f), glm::vec3(1.0f));
 	
@@ -101,26 +104,37 @@ int main(int argc, char** argv){
 		parseWorldIntoScene(scene, walkmapPath);
 	}
 	
-	printf("Done\nWalkmap:\n");
+	// create player
+	Keymap keymap = (Keymap){ GLFW_KEY_W, GLFW_KEY_S, GLFW_KEY_A, GLFW_KEY_D, GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT, GLFW_KEY_E, GLFW_KEY_Q };
 	
-	for(uint32_t i = 0; i < scene->walkmap->size(); i++){
-		BoundingBox* box = scene->walkmap->at(i);
-		
-		printf("%d: (p: %f, %f, %f, s: %f, %f) adjacents: %d\n", i, box->position.x, box->position.y, box->position.z, box->size.x, box->size.y, box->adjacent->size());
-	}
+	Player* player = createPlayer(camera, keymap, scene);
 	
-	//printf("Done\nRender Loop Starting\n");
+	printf("Done\nRender Loop Starting\n");
 	
 	// render loop //
+	double delta = 0.0;
+	double lastFrame = glfwGetTime();
 	while(!shouldWindowClose(window)){
+		// update delta
+		double time = glfwGetTime();
+		delta = time-lastFrame;
+		lastFrame = time;
+		
 		// update camera
 		glm::vec3 rotationVector = calculateRotationVector();
-		glm::vec3 movementVector = calculateMovementVector(window, camera);
+		//glm::vec3 movementVector = calculateMovementVector(window, camera);
+		
+		// update player position (works regardless of walkmap presence)
+		updatePlayerPosition(player, scene, window, delta);
 		
 		rotateCamera(camera, rotationVector);
 		constrainCameraRotation(camera, glm::vec3(glm::radians(-89.f), NO_LB, NO_LB), glm::vec3(glm::radians(89.f), NO_UB, NO_UB));
-		translateCamera(camera, movementVector);
+		//translateCamera(camera, movementVector);
 		
+		//printf("fr: %f\n", 1.0/delta);
+		//printf("camera: %f, %f, %f, %f, %f, %f\n", camera->position.x, camera->position.y, camera->position.z, camera->rotation.x, camera->rotation.y, camera->rotation.z);
+		
+		// reset mouse
 		resetMouseDelta();
 		
 		// sounds //

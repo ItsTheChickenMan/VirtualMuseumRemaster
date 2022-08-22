@@ -115,6 +115,7 @@ const char objectBlockDelimiter = '$';
 const char lightBlockDelimiter = '&';
 const char modelBlockDelimiter = '+';
 const char walkBoxBlockDelimiter = '~';
+const char settingsBlockDelimiter = '@';
 
 // create a block
 Block* createBlock(){
@@ -166,7 +167,7 @@ bool blockCharParser(Block* block, char byte){
 		block->parameterBuffer->push_back(byte);
 	} else {
 		// flush parameter buffer
-		if(isStringNumber( *block->parameterBuffer )){
+		if(block->parameterBuffer->length() > 0 && isStringNumber( *block->parameterBuffer )){
 			block->numbers->push_back( std::stof(*block->parameterBuffer) );
 		} else {
 			block->strings->push_back( *block->parameterBuffer );
@@ -370,7 +371,6 @@ void lightBlockToScene(Block* block, Scene* scene){
 	scene->pointLights->push_back(light);
 }
 
-// uses textureBlockCharParser
 void modelBlockToScene(Block* block, Scene* scene){
 	// load values
 	std::string path = block->strings->at(0);
@@ -386,7 +386,6 @@ void modelBlockToScene(Block* block, Scene* scene){
 	(*scene->models)[modelName] = model;
 }
 
-// uses lightBlockCharParser
 void walkBoxBlockToScene(Block* block, Scene* scene){
 	// load values
 	float x = block->numbers->at(0);
@@ -415,6 +414,18 @@ void walkBoxBlockToScene(Block* block, Scene* scene){
 	scene->walkmap->push_back(box);
 }
 
+void settingsBlockToScene(Block* block, Scene* scene){
+	// block for misc settings
+	
+	// because memory is sequential in structs, this acts as an array of settings
+	float* settings = &(scene->playerHeight);
+	
+	// loop through numbers and load them to settings
+	for(uint32_t i = 0; i < block->numbers->size(); i++){
+		settings[i] = block->numbers->at(i);
+	}
+}
+
 // create the shell of a scene
 Scene* createScene(){
 	// allocate memory
@@ -427,6 +438,12 @@ Scene* createScene(){
 	scene->staticObjects = new std::map<VertexData*, std::vector<TexturedRenderableObject*>*>();
 	scene->pointLights = new std::vector<PointLight*>();
 	scene->walkmap = new std::vector<BoundingBox*>();
+	
+	// default settings
+	scene->playerHeight = 2.f;
+	scene->playerRadius = 0.5f;
+	scene->stepHeight = 0.4f;
+	scene->maxPlayerSpeed = 2.f;
 	
 	return scene;
 }
@@ -442,7 +459,7 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	}
 	
 	// settings
-	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter, walkBoxBlockDelimiter};
+	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter, walkBoxBlockDelimiter, settingsBlockDelimiter};
 	
 	// control states
 	bool parsingBlock = false;
@@ -454,7 +471,7 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	// first param = pointer to block (void* here to be valid for all pointers)
 	// second param = char to parse
 	// returns false if the block hasn't finished parsing and true if it has
-	void (*blockParsers[6])(Block*,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene, walkBoxBlockToScene};
+	void (*blockParsers[7])(Block*,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene, walkBoxBlockToScene, settingsBlockToScene};
 	
 	// loop through each byte
 	char byte;
@@ -536,4 +553,8 @@ Scene* parseWorld(const char* file){
 	parseWorldIntoScene(scene, file);
 	
 	return scene;
+}
+
+bool hasWalkmap(Scene* scene){
+	return scene->walkmap->size() > 0;
 }
