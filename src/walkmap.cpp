@@ -180,7 +180,12 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 		}
 		
 		// update position
-		player->camera->position = glm::vec3(position.x, player->currentBbox->position.y + scene->playerHeight, position.z);
+		// we make the camera 7/8 of player height to leave a bit of headroom and not look through objects above
+		float currentHeight = player->camera->position.y;
+		float desiredHeight = player->currentBbox->position.y + scene->playerHeight*0.875;
+		float newHeight = currentHeight + (desiredHeight - currentHeight)*scene->heightSpeed;
+		
+		player->camera->position = glm::vec3(position.x, newHeight, position.z);
 	} else {
 		// no walkmap
 		player->camera->position = position;

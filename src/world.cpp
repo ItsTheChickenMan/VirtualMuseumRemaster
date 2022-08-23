@@ -446,6 +446,7 @@ Scene* createScene(){
 	scene->playerRadius = 0.5f;
 	scene->stepHeight = 0.4f;
 	scene->maxPlayerSpeed = 2.f;
+	scene->heightSpeed = 0.1f;
 	
 	return scene;
 }

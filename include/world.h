@@ -62,6 +62,13 @@ struct Scene {
 	float playerRadius;
 	float stepHeight;
 	float maxPlayerSpeed;
+	
+	// the rate at which updatePlayerPosition should approach the desired height
+	// the formula for the player height given a desired height is:
+	// currentHeight + (desiredHeight - currentHeight)*heightSpeed
+	// the range of this number should be (0, 1]
+	// a range of 1 is the same as matching the desiredHeight instantly each frame
+	float heightSpeed;
 };
 
 struct Block {
