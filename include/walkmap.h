@@ -33,6 +33,9 @@ struct Player {
 	
 	// last bounding box the player was standing on
 	BoundingBox* currentBbox;
+	
+	// if the player is currently locked to an axis (by the edge of a bbox) then this is set to the axis, otherwise it's set to 0, 0
+	glm::vec2 lockAxis;
 };
 
 // methods //

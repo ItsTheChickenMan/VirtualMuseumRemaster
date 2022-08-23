@@ -125,6 +125,15 @@ int main(int argc, char** argv){
 		//glm::vec3 movementVector = calculateMovementVector(window, camera);
 		
 		// update player position (works regardless of walkmap presence)
+		/*for (std::map<VertexData*, std::vector<TexturedRenderableObject*>*>::iterator it = scene->staticObjects->begin(); it != scene->staticObjects->end(); it++){
+
+			if(!it->second) continue;
+			
+			for(uint32_t i = 0; i < it->second->size(); i++){
+				it->second->at(i)->visible = false;
+			}
+		}*/
+		
 		updatePlayerPosition(player, scene, window, delta);
 		
 		rotateCamera(camera, rotationVector);

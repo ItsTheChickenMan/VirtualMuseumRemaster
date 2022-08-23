@@ -71,7 +71,7 @@ void renderScene(Scene* scene, PerspectiveCamera* camera, ShaderProgramEx* progr
 		for(uint32_t i = 0; i < it->second->size(); i++){
 			TexturedRenderableObject* object = it->second->at(i);
 			
-			if(!object) continue;
+			if(!object || !object->visible) continue;
 			
 			// set model matrix (necessary for lighting)
 			glUniformMatrix4fv(getProgramExUniformLocation(programEx, "model"), 1, GL_FALSE, glm::value_ptr(object->renderableObject->modelMatrix));

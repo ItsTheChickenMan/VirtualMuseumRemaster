@@ -1,5 +1,5 @@
 # tests for walkmap (not really for the .world parser, basic.world is better at testing the .world parser's limits)
-# made for 0.1f step height, 2.0f height
+# made for 0.1f step height, 2.0f height, 0.25f player radius, and whatever max speed
 
 # texture initialization blocks
 

@@ -19,6 +19,8 @@ struct TexturedRenderableObject {
 	glm::vec3 color; // color if texture data is null
 	
 	RenderableObject* renderableObject;
+	
+	bool visible; // used by scene to only render "visible" objects, usually for debugging
 };
 
 // 2d bounding box struct

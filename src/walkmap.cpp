@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include <glm/gtx/norm.hpp>
+#include <glm/gtx/vector_angle.hpp>
 
 // construct player
 Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap, Scene* scene){
@@ -14,6 +15,7 @@ Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap, Scene* scene){
 	
 	player->camera = camera;
 	player->keymap = keymap;
+	player->lockAxis = glm::vec2(0, 0);
 	player->currentBbox = NULL;
 	
 	// determine currentBox
@@ -63,11 +65,15 @@ glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed
 BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double distance, double delta, uint32_t* iterations){
 	if(bbox == NULL) return NULL;
 	
-	(*iterations)++;
+	if(iterations != NULL) (*iterations)++;
 	
 	// add to checked
 	checked->push_back(bbox);
 	
+	/*for(std::map<VertexData*, std::vector<TexturedRenderableObject*>*>::iterator it = scene->staticObjects->begin(); it != scene->staticObjects->end(); it++){
+		it->second->at(std::find(scene->walkmap->begin(), scene->walkmap->end(), bbox) - scene->walkmap->begin())->visible = true;	
+	}*/
+
 	// if player is in bbox, all good
 	if(bboxContains(bbox, glm::vec2(position.x, position.z))){
 		return bbox;
@@ -84,6 +90,7 @@ BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 posit
 			if(std::find(checked->begin(), checked->end(), adjacent) != checked->end()) continue;
 			
 			float newDistance = distance + (double)glm::length( glm::vec2(oldPosition.x, oldPosition.z) - glm::vec2(adjacent->position.x, adjacent->position.z) );
+			//newDistance = 0;
 			
 			// check other
 			BoundingBox* other = checkBbox(adjacent, oldPosition, position, scene, checked, newDistance, delta, iterations);
@@ -102,7 +109,24 @@ BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 posit
 // update player position from input
 void updatePlayerPosition(Player* player, Scene* scene, Window* window, double delta){
 	// get position of player given no interference
-	glm::vec3 position = player->camera->position + getMovementVector(player, window, scene->maxPlayerSpeed, delta);
+	glm::vec3 movementVector = getMovementVector(player, window, scene->maxPlayerSpeed, delta);
+	
+	// adjust movement vector if locked to an axis
+	/*if(glm::length2(player->lockAxis) > 0){
+		// project movement vector along axis through dot product
+		float mvFactor = glm::dot(player->lockAxis, glm::normalize(glm::vec2(movementVector.x, movementVector.z)));
+		
+		glm::vec2 tempMv = player->lockAxis * mvFactor * scene->maxPlayerSpeed * (float)delta;
+		
+		movementVector.x = tempMv.x;
+		movementVector.z = tempMv.y;
+	}*/
+	
+	glm::vec3 position = player->camera->position + movementVector;
+	
+	/*for (std::map<VertexData*, std::vector<TexturedRenderableObject*>*>::iterator it = scene->staticObjects->begin(); it != scene->staticObjects->end(); it++){
+		it->second->at(std::find(scene->walkmap->begin(), scene->walkmap->end(), player->currentBbox) - scene->walkmap->begin())->visible = true;
+	}*/
 	
 	// check if player is within walkmap, if one exists
 	if(scene->walkmap->size() > 0){
@@ -112,15 +136,53 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 		
 		BoundingBox* playerBbox = checkBbox(player->currentBbox, player->camera->position, position, scene, &checked, 0, delta, &iterations);
 		
+		//printf("iterations: %d\n", iterations);
+		
 		// if playerBbox was found, update player bbox and call it a day
 		if(playerBbox != NULL){
 			player->currentBbox = playerBbox;
-			
-			player->camera->position = glm::vec3(position.x, player->currentBbox->position.y + scene->playerHeight, position.z);
+			player->lockAxis = glm::vec2(0, 0);
 		} else {
-			printf("player exiting\n");
+			// correct player position
+			// FIXME: the math below is overly complex and can/should be simplified + the extra bbox check isn't fun
+			
+			// first determine which side of the bounding box the player is colliding with
+			if(glm::length2(player->lockAxis) == 0){
+				bool temp = position.x < player->currentBbox->UL.x || position.x > player->currentBbox->UR.x;
+				glm::vec2 axis = glm::vec2(!temp, !!temp);
+				
+				player->lockAxis = axis;
+			}
+			
+			// project movement vector along axis through dot product
+			float mvFactor = glm::dot(player->lockAxis, glm::normalize(glm::vec2(movementVector.x, movementVector.z)));
+			
+			glm::vec2 tempMv = player->lockAxis * mvFactor * scene->maxPlayerSpeed * (float)delta;
+			
+			movementVector.x = tempMv.x;
+			movementVector.z = tempMv.y;
+			
+			position = player->camera->position + movementVector;
+			
+			// refetch player bbox
+			// this is inefficient and it hurts to do
+			checked.clear();
+			
+			playerBbox = checkBbox(player->currentBbox, player->camera->position, position, scene, &checked, 0, delta, NULL);
+			
+			if(!playerBbox){
+				position = player->camera->position;
+			} else {
+				player->currentBbox = playerBbox;
+			}
+			
+			//printf("player exiting\n");
 		}
+		
+		// update position
+		player->camera->position = glm::vec3(position.x, player->currentBbox->position.y + scene->playerHeight, position.z);
 	} else {
+		// no walkmap
 		player->camera->position = position;
 	}
 }

@@ -16,6 +16,7 @@ TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* objec
 	texturedObject->renderableObject = object;
 	texturedObject->textureData = texture;
 	texturedObject->color = glm::vec3(0);
+	texturedObject->visible = true;
 	
 	return texturedObject;
 }
@@ -27,6 +28,7 @@ TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* objec
 	texturedObject->renderableObject = object;
 	texturedObject->textureData = NULL;
 	texturedObject->color = color;
+	texturedObject->visible = true;
 	
 	return texturedObject;
 }
