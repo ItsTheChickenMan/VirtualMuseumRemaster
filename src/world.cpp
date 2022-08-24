@@ -242,6 +242,28 @@ void objectBlockToScene(Block* block, Scene* scene){
 	// check amount of strings
 	uint32_t stringParams = block->strings->size();
 	
+	// first check if string params contains a special keyword
+	// TODO: maybe write a better system for this?
+	if(stringParams > 1){
+		// loop breaks when there are no more keyword
+		bool keywordsLeft = true;
+		
+		while(keywordsLeft){
+			std::string keyword = block->strings->at(stringParams-1);
+			
+			if(keyword == "nowalk"){
+				// nowalk is for walkmap parser only, so just get rid of the keyword and move on
+				stringParams--;
+			} else if(keyword == "invisible"){
+				// ignore object completely
+				// no cleanup necessary
+				return;
+			} else {
+				keywordsLeft = false;
+			}
+		}
+	}
+	
 	// mode depends on number of string parameters (1 = model, 2 = texture + vertexData)
 	switch(stringParams){
 		case 0: {
@@ -297,12 +319,6 @@ void objectBlockToScene(Block* block, Scene* scene){
 			// load values
 			std::string textureName = block->strings->at(0);
 			std::string vertexDataName = block->strings->at(1);
-			
-			// check if texture is invisible
-			if(textureName == "invisible"){
-				// no cleanup required, just leave
-				return;
-			}
 			
 			// check texture
 			TextureData* texture = (*scene->textures)[textureName];

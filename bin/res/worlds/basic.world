@@ -6,7 +6,7 @@
 
 # %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
 # *[shapeName, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
-# +[modelPath, modelName, w, h, d] = a special use block for initializing models.  models need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block.  the (w,h,d) parameters are for bounding box size, but only need to be defined if using walkmaps (the full scale .world parser does not require these values)
+# +[modelPath, modelName, x, y, z, w, h, d] = a special use block for initializing models.  models need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block.  the (x,y,z) and (w,h,d) parameters are for bounding box offset and size, but only need to be defined if using walkmaps (the full scale .world parser does not require these values)
 # $[x, y, z, y, p, r, w, h, d, *textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (not required if using a model, which load their own textures), and vertex data (or default)
 # &[x, y, z, r, g, b, c, l, q, ambientStrength, diffuseStrength] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), constant+linear+quadratic values for attenuation (c,l,q), and ambient + diffuse strength
 
@@ -14,13 +14,17 @@
 # some texture names have special meanings:
 
 # default = default texture used when textureName is invalid.  if no default is defined, then an invalid textureName throws an error while parsing.
-# invisible = using this texture in an object won't make the object invisible as the name would suggest, but rather forces the engine's world parser to ignore the object altogether.  It will not be ignored by the walkmap generator's parser, however, which makes this useful for creating invisible barriers and floors in walkmaps.  this texture should NOT be defined at all; it's provided by the engine.  Any textures initialized using this name will be ignored by the parser.
 
 
 # some vertex data names have special meanings:
 
 # default = default vertex data used when vertexDataName is invalid or unspecified.  if no default is defined, then an invalid or unspecified vertexDataName throws an error while parsing.
 
+
+# keywords are extra string values which can be included at the end of blocks (currently, all keywords are for object blocks).  multiple 
+
+# invisible = using this keyword in an object won't make the object invisible as the name would suggest, but rather forces the engine's world parser to ignore the object altogether.  It will not be ignored by the walkmap generator's parser, however, which makes this useful for creating invisible barriers and floors in walkmaps.
+# nowalk = add this as the last string parameter in an object block to have the walkmap generator ignore it.  this isn't a reserved texture name or vertex data name, but rather a special keyword meaning that textures and vertex data can still be named "nowalk" (if you really want to).  Think of this keyword like the opposite of the "invisible" keyword: this keyword makes the player not collide with things which are there, while invisible makes the player collide with things which aren't there.  These two keywords can be used together to control player collision with objects which might be hard to control otherwise, such as models which have hollow space.  A good example of this is with the archway below, which can't be adequately represented by the single bounding box created for it but can be adequately represented by 3 invisible objects.
 
 
 # basic world starts here...
@@ -33,14 +37,14 @@
 
 # vertex data initialization blocks
 
-*[cube, cube]
+*[cube, cube, 0, 0, 0, 1, 1, 1]
 
 # model blocks
 
-+[./res/models/Avocado.glb, avocado]
-+[./res/models/SmilingFace.glb, smiley]
-+[./res/models/CesiumMan.glb, man]
-+[./res/models/archway.glb, archway]
++[./res/models/Avocado.glb, avocado, 0, 3.15, 0, 5, 6.5, 3]
++[./res/models/SmilingFace.glb, smiley, 0, 0, -0.05, 1.7, 1.7, 1.7]
++[./res/models/CesiumMan.glb, man, 0, 0, 0.75, 0.4, 1.15, 1.55]
++[./res/models/archway.glb, archway, 0, 0, 0, 5, 1, 8]
 
 # object blocks
 
@@ -57,12 +61,20 @@ $[-3.75, 5.5, -4.5,    0, 0, 0,    2.5, 10, 1,   wall,    cube]
 $[3.75, 5.5, -4.5,    0, 0, 0,    2.5, 10, 1,   wall,    cube]
 $[0, 9.5, -4.5,    0, 0, 0,    5, 2, 1,   wall,    cube]
 
-# fun little cubes
-$[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
+# archway
+# here's a good example of how to use nowalk and invisible to create adequate collisions for an object that can't be properly represented by just the bounding box
+
+# we make the actual archway itself nowalk so that the large bounding box doesn't prevent the player from walking through it
+$[0, 4.5, -4.5,     -90, 0, 0,    1, 1, 1,    archway,    nowalk]
+
+# then make two invisible walls where the actual archway walls are
+$[2.25, 4.5, -4.5,    0, 0, 0,    0.5, 8, 1,    default,    cube,    invisible]
+$[-2.25, 4.5, -4.5,    0, 0, 0,    0.5, 8, 1,    default,    cube,    invisible]
+
+# fun little exhibits
 $[-4, 1.5, 1,     0, 90, 0,    1, 1, 1,    smiley]
 $[4, 0.65, 1,     -90, 180, 0,    3, 3, 3,    man]
-
-$[0, 4.5, -4.5,     -90, 0, 0,    1, 1, 1,    archway]
+$[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 
 # light blocks
 

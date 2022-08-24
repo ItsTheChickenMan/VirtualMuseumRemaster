@@ -1,0 +1,22 @@
+# testing archway size
+
+%[./res/textures/default.png, default]
+
+*[cube, cube]
+
++[./res/models/CesiumMan.glb, test, 0, 0, 0.75, 0.4, 1.15, 1.55]
+
+# model
+$[0, 0, 0,    -90, 90, 0,    1, 1, 1,    test]
+
+# bbox test
+$[0, 0.75, 0,    0, 0, 0,   0.4, 1.55, 1.15,  default,    cube]
+
+# axes
+# long = x
+# short = z
+$[5, -10, 0,    0, 0, 0,    10, 0.2, 0.2,    default,    cube]    
+$[0, -10, 2.5,    0, 0, 0,    0.2, 0.2, 5,    default,    cube]
+
+# fullbright
+&[0, 0, 0,     1, 1, 1,    1, 0.072, 0.0175,     1.0, 0.0]
