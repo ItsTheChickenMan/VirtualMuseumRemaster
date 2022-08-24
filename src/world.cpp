@@ -197,6 +197,9 @@ void textureBlockToScene(Block* block, Scene* scene){
 	std::string texturePath = block->strings->at(0);
 	std::string textureName = block->strings->at(1);
 	
+	// exclude required special textures
+	if(textureName == "invisible") return;
+	
 	// load texture
 	(*scene->textures)[textureName] = createTextureData(texturePath.c_str());
 }
@@ -209,6 +212,7 @@ void vertexDataBlockToScene(Block* block, Scene* scene){
 	// load vertex data
 	VertexDataInfo info = g_shapes[shapeName];
 	
+	// FIXME: have createVertexData accept VertexDataInfo as a parameter instead of each individually (or both)
 	(*scene->vertexData)[vertexDataName] = createVertexData(info.vertices, info.vertexCount, info.sizeInBytes, info.componentOrder, info.numComponents);
 }
 
@@ -293,6 +297,12 @@ void objectBlockToScene(Block* block, Scene* scene){
 			// load values
 			std::string textureName = block->strings->at(0);
 			std::string vertexDataName = block->strings->at(1);
+			
+			// check if texture is invisible
+			if(textureName == "invisible"){
+				// no cleanup required, just leave
+				return;
+			}
 			
 			// check texture
 			TextureData* texture = (*scene->textures)[textureName];

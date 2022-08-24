@@ -9,7 +9,7 @@
 
 # vertex data initialization blocks
 
-*[cube, cube]
+*[cube, cube, 1, 1, 1]
 
 # light blocks
 # &[0, 0, 0,     1, 1, 1,    1, 0, 0,     1.0, 0]

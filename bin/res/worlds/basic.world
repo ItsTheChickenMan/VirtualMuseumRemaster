@@ -1,6 +1,7 @@
 # basic world file
 # lines starting with hashtags are ignored when parsed
 
+
 # blocks are any chars enclosed by two brackets and a delimiter character.  here are all valid blocks (* = optional):
 
 # %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
@@ -9,12 +10,14 @@
 # $[x, y, z, y, p, r, w, h, d, *textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (not required if using a model, which load their own textures), and vertex data (or default)
 # &[x, y, z, r, g, b, c, l, q, ambientStrength, diffuseStrength] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), constant+linear+quadratic values for attenuation (c,l,q), and ambient + diffuse strength
 
+
 # some texture names have special meanings:
 
 # default = default texture used when textureName is invalid.  if no default is defined, then an invalid textureName throws an error while parsing.
+# invisible = using this texture in an object won't make the object invisible as the name would suggest, but rather forces the engine's world parser to ignore the object altogether.  It will not be ignored by the walkmap generator's parser, however, which makes this useful for creating invisible barriers and floors in walkmaps.  this texture should NOT be defined at all; it's provided by the engine.  Any textures initialized using this name will be ignored by the parser.
 
 
-# some vertex data names have special meanings
+# some vertex data names have special meanings:
 
 # default = default vertex data used when vertexDataName is invalid or unspecified.  if no default is defined, then an invalid or unspecified vertexDataName throws an error while parsing.
 
