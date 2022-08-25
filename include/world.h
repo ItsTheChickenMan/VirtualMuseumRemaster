@@ -18,7 +18,7 @@ struct Scene;
 struct TriggerInfo;
 
 // event checker function
-typedef bool (*EventCheckFunction)(Scene*, TriggerInfo*);
+typedef bool (*EventCheckFunction)(Scene*, TriggerInfo*, bool);
 
 // trigger action function
 typedef void (*TriggerActionFunction)(Scene*, TriggerInfo*);
@@ -153,13 +153,15 @@ struct Block {
 // methods //
 
 // trigger management
-bool onStartChecker(Scene* scene, TriggerInfo* triggerInfo);
-bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo);
-bool onEnterRepeatChecker(Scene* scene, TriggerInfo* triggerInfo);
+bool onStartChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
+bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
+bool onEnterRepeatChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
+bool onExitChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
 
 void logToConsole(Scene* scene, TriggerInfo* triggerInfo);
 void changeSetting(Scene* scene, TriggerInfo* triggerInfo);
-void playBackgroundMusic(Scene* scene, TriggerInfo* triggerInfo);
+void playBackgroundMusicAction(Scene* scene, TriggerInfo* triggerInfo);
+void setBackgroundMusicSettings(Scene* scene, TriggerInfo* triggerInfo);
 
 TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action);
 
@@ -175,16 +177,17 @@ BoundingBox* createBbox(glm::vec2 p, glm::vec2 s);
 BoundingBox* createBbox(glm::vec3 p, glm::vec2 s);
 BoundingBox* createBbox(BoundingBox* original);
 
-Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap, Scene* scene);
+bool bboxContains(BoundingBox* box, glm::vec2 point);
+bool cubesIntersecting(glm::vec3 p1, glm::vec3 s1, glm::vec3 p2, glm::vec3 s2);
+
+Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap);
 glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed, double delta);
 BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double distance, double delta, uint32_t* iterations);
 void updatePlayerPosition(Player* player, Scene* scene, Window* window, double delta);
 
-bool bboxContains(BoundingBox* box, glm::vec2 point);
-
-Scene* createScene();
+Scene* createScene(Player* player);
 void parseWorldIntoScene(Scene* scene, const char* file);
-Scene* parseWorld(const char* file);
+Scene* parseWorld(const char* file, Player* player);
 bool hasWalkmap(Scene* scene);
 void checkTriggers(Scene* scene);
 

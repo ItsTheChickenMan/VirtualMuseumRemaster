@@ -2,6 +2,7 @@
 #include <world.h>
 #include <utils.h>
 #include <shapes.h>
+#include <audio.h>
 
 #include <cctype>
 
@@ -17,15 +18,21 @@
 // this should not be modified at all during runtime
 const std::map<std::string, EventCheckFunction> g_eventCheckers = {
 	{"onStart", onStartChecker},
+	
 	{"onEnter", onEnterChecker},
+	
 	{"onEnterRepeat", onEnterRepeatChecker},
+	{"onEnterRepeating", onEnterRepeatChecker},
+	
+	{"onExit", onExitChecker}
 };
 
 // this map is for storing action methods for each action name
 const std::map<std::string, TriggerActionFunction> g_triggerActions = {
 	{"logToConsole", logToConsole},
 	{"changeSetting", changeSetting},
-	{"playBackgroundMusic", playBackgroundMusic}
+	{"playBackgroundMusic", playBackgroundMusicAction},
+	{"setBackgroundMusicSettings", setBackgroundMusicSettings}
 };
 
 
@@ -33,35 +40,64 @@ const std::map<std::string, TriggerActionFunction> g_triggerActions = {
 
 // checker functions
 // syntax = eventNameChecker
+// note that in all checkers, 
 
-bool onStartChecker(Scene* scene, TriggerInfo* triggerInfo){
+bool onStartChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
 	return scene->frame == 0;
 }
 
-bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo){
+bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
 	// if this is the first frame, add some extra trigger related info to triggerInfo
 	// this shouldn't cause any issues because triggers can't be created dynamically, so all valid triggers should be checked on the first checkTriggers call
 	if(scene->frame == 0){
 		// add extra float value to determine state of trigger
-		// this should always remain the last item in triggerInfo->numbers
-		// if 0.0, it means that the player was not in this trigger's bounding cube last frame.  the value is set to 0.0 whenever this trigger is checked and the player isn't in the bounding cube.
-		// if any value other than 0.0 (but should be 1.0), the player was in this trigger's bounding cube last frame.  this means that if the player is in the bounding cube again this frame, the trigger shouldn't fire.  the value is set to 1.0 the first frame that the player is in the bounding cube and then not again until the value is set back to 0.0
-		triggerInfo->numbers->push_back(0.0f);
+		// this value is equal to the last frame in which the player was intersecting the bounding box.  the trigger will never fire between two consecutive frames
+		triggerInfo->numbers->push_back(0.f);
 	}
 	
-	// check if player is in bounding cube
+	int32_t lastFrame = (int32_t)(*(triggerInfo->numbers->end()-1));
 	
+	if(inBoundingCube){
+		// update last frame
+		*(triggerInfo->numbers->end()-1) = (float)scene->frame;
+		
+		// if this frame and the last intersection frame are consecutive, return false, otherwise return true
+		return scene->frame - lastFrame > 1;
+	}
 	
 	return false;
 }
 
-bool onEnterRepeatChecker(Scene* scene, TriggerInfo* triggerInfo){
-	// this one's easy; just check if the player is in the bounding cube or not
+bool onEnterRepeatChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+	return inBoundingCube;
+}
+
+bool onExitChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+	// works similar to onEnterChecker, but the opposite
+	
+	// if this is the first frame, add some extra trigger related info to triggerInfo
+	if(scene->frame == 0){
+		// add extra float value to determine state of trigger
+		// this value is equal to the last frame in which the player was intersecting the bounding box.  the trigger will never fire between two consecutive frames
+		triggerInfo->numbers->push_back(0.f);
+	}
+	
+	int32_t lastFrame = (int32_t)(*(triggerInfo->numbers->end()-1));
+	
+	if(!inBoundingCube){
+		// update last frame
+		*(triggerInfo->numbers->end()-1) = (float)scene->frame;
+		
+		// if this frame and the last intersection frame are consecutive, return false, otherwise return true
+		return scene->frame - lastFrame > 1;
+	}
 	
 	return false;
 }
+
 
 // action functions
+
 void logToConsole(Scene* scene, TriggerInfo* triggerInfo){
 	for(uint32_t i = 0; i < triggerInfo->strings->size(); i++){
 		if(i == 0){
@@ -83,9 +119,49 @@ void logToConsole(Scene* scene, TriggerInfo* triggerInfo){
 }
 
 void changeSetting(Scene* scene, TriggerInfo* triggerInfo){
+	// validate size
+	if(triggerInfo->numbers->size() < 2){
+		return;
+	}
+	
+	// get setting index as int
+	int32_t index = (int32_t)triggerInfo->numbers->at(0);
+	
+	// new setting
+	float setting = triggerInfo->numbers->at(1);
+	
+	// modify setting
+	(&scene->playerHeight)[index] = setting;
 }
 
-void playBackgroundMusic(Scene* scene, TriggerInfo* triggerInfo){
+// we call this playBackgroundMusicAction because playBackgroundMusic already exists in audio.h
+void playBackgroundMusicAction(Scene* scene, TriggerInfo* triggerInfo){
+	// validate size
+	// FIXME: it's not super efficient to validate every time this is fired when the string and numbers size never changes.  maybe do a separate validationCheck function per action that gets run every time a trigger block is created?  would avoid some other bugs caused by TriggerInfo holding initialization values as well (which could cause this to fail)
+	if(triggerInfo->strings->size() < 2 || triggerInfo->numbers->size() < 1){
+		return;
+	}
+	
+	// load vals
+	std::string& path = triggerInfo->strings->at(0);
+	bool loop = triggerInfo->strings->at(1) == "true";
+	float volume = triggerInfo->numbers->at(0);
+	
+	playBackgroundMusic(path, volume, loop);
+}
+
+void setBackgroundMusicSettings(Scene* scene, TriggerInfo* triggerInfo){
+	// validate size
+	if(triggerInfo->strings->size() < 1 || triggerInfo->numbers->size() < 1){
+		return;
+	}
+	
+	// load vals
+	bool loop = triggerInfo->strings->at(0) == "true";
+	float volume = triggerInfo->numbers->at(0);
+	
+	setBackgroundMusicLoop(loop);
+	setBackgroundMusicVolume(volume);
 }
 
 // others stuff //
@@ -199,33 +275,26 @@ bool bboxContains(BoundingBox* bbox, glm::vec2 point){
 
 // check if two cubes are intersecting
 bool cubesIntersecting(glm::vec3 p1, glm::vec3 s1, glm::vec3 p2, glm::vec3 s2){
-	return true;
+	return (
+		nearly_greater_or_eq(p1.x+s1.x/2.f, p2.x-s2.x/2.f) &&
+		nearly_greater_or_eq(p2.x+s2.x/2.f, p1.x-s1.x/2.f) &&
+		
+		nearly_greater_or_eq(p1.y+s1.y/2.f, p2.y-s2.y/2.f) &&
+		nearly_greater_or_eq(p2.y+s2.y/2.f, p1.y-s1.y/2.f) &&
+		
+		nearly_greater_or_eq(p1.z+s1.z/2.f, p2.z-s2.z/2.f) &&
+		nearly_greater_or_eq(p2.z+s2.z/2.f, p1.z-s1.z/2.f)
+	);
 }
 
 // construct player
-Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap, Scene* scene){
+Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap){
 	Player* player = allocateMemoryForType<Player>();
 	
 	player->camera = camera;
 	player->keymap = keymap;
 	player->lockAxis = glm::vec2(0, 0);
 	player->currentBbox = NULL;
-	
-	// determine currentBox
-	if(scene->walkmap->size() > 0){
-		for(uint32_t i = 0; i < scene->walkmap->size(); i++){
-			if(bboxContains(scene->walkmap->at(i), glm::vec2(camera->position.x, camera->position.z))){
-				player->currentBbox = scene->walkmap->at(i);
-				
-				break;
-			}
-		}
-		
-		if(player->currentBbox == NULL){
-			player->currentBbox = scene->walkmap->at(0);
-			player->camera->position = player->currentBbox->position; // height should correct itself
-		}
-	}
 	
 	return player;
 }
@@ -313,7 +382,7 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 		//printf("iterations: %d\n", iterations);
 		
 		// if playerBbox was found, update player bbox and call it a day
-		if(playerBbox != NULL){
+		if(playerBbox != NULL && player->currentBbox != NULL){
 			player->currentBbox = playerBbox;
 			player->lockAxis = glm::vec2(0, 0);
 		} else {
@@ -737,7 +806,7 @@ void triggerBlockToScene(Block* block, Scene* scene){
 	
 	// next three floats should be scale
 	for(uint32_t i = 3; i < 6; i++){
-		(&scale.x)[i] = block->numbers->at(i);
+		(&scale.x)[i-3] = block->numbers->at(i);
 	}
 	
 	// load strings
@@ -782,7 +851,9 @@ void triggerBlockToScene(Block* block, Scene* scene){
 // copies the elements from numbers and strings
 TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action){
 	// check that action exists before doing anything
-	
+	if(!g_triggerActions.count(action)){
+		printf("Invalid action %s for trigger info\n", action.c_str());
+	}
 	
 	TriggerInfo* info = allocateMemoryForType<TriggerInfo>();
 	
@@ -796,11 +867,13 @@ TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<
 }
 
 // create the shell of a scene
-Scene* createScene(){
+// also initializes player currentBbox
+Scene* createScene(Player* player){
 	// allocate memory
 	Scene* scene = allocateMemoryForType<Scene>();
 	
 	// initialize values
+	scene->player = player;
 	scene->vertexData = new std::map<std::string, VertexData*>();
 	scene->textures = new std::map<std::string, TextureData*>();
 	scene->models = new std::map<std::string, Model*>();
@@ -920,11 +993,28 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	
 	// update walkmap offset
 	scene->walkmapOffset = scene->walkmap->size();
+	
+	// player setup
+	// determine currentBox if null
+	if(scene->player->currentBbox == NULL && scene->walkmap->size() > 0){
+		for(uint32_t i = 0; i < scene->walkmap->size(); i++){
+			if(bboxContains(scene->walkmap->at(i), glm::vec2(scene->player->camera->position.x, scene->player->camera->position.z))){
+				scene->player->currentBbox = scene->walkmap->at(i);
+				
+				break;
+			}
+		}
+		
+		if(scene->player->currentBbox == NULL){
+			scene->player->currentBbox = scene->walkmap->at(0);
+			scene->player->camera->position = scene->player->currentBbox->position; // height should correct itself
+		}
+	}
 }
 
 // parse world
-Scene* parseWorld(const char* file){
-	Scene* scene = createScene();
+Scene* parseWorld(const char* file, Player* player){
+	Scene* scene = createScene(player);
 	
 	parseWorldIntoScene(scene, file);
 	
@@ -947,7 +1037,10 @@ void checkTriggers(Scene* scene){
 			TriggerInfo* triggerInfo = it->second->at(i);
 			
 			// check if we need to fire this trigger
-			bool fire = (*checker)(scene, triggerInfo);
+			
+			// intersecting is always true if the bounding cube's scale is all zeroes
+			bool intersecting = glm::length2(triggerInfo->scale) == 0.0f || cubesIntersecting(glm::vec3(scene->player->camera->position.x, scene->player->camera->position.y - scene->playerHeight*0.375f, scene->player->camera->position.z), glm::vec3(scene->playerRadius, scene->playerHeight, scene->playerRadius), triggerInfo->position, triggerInfo->scale);
+			bool fire = (*checker)(scene, triggerInfo, intersecting);
 			
 			if(fire){
 				// fire at will

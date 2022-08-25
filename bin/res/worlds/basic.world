@@ -32,17 +32,19 @@
 
 # more info on trigger blocks (or just "triggers"):
 
-# triggers allow certain predefined actions to occur on certain predefined events.  the events are usually centered around player interaction, but there are exceptions.  triggers are fired when their triggerEvent happens.  multiple triggers can be defined for a single event.  a trigger does not always need a bounding cube (the x,y,z,w,h,d parameters in trigger block), but if at least 1 size parameter (w,h,d) is greater than 0, then the trigger can only be fired if the player is intersecting the defined bounding cube (and if the their triggerEvent happens).  if a trigger's event requires a bounding cube, but it's not present, the parser ignores the trigger.
+# triggers allow certain predefined actions to occur on certain predefined events.  the events are usually centered around player interaction, but there are exceptions.  triggers are fired when their triggerEvent happens.  multiple triggers can be defined for a single event.  a trigger does not always need a bounding cube (the x,y,z,w,h,d parameters in trigger block), but if at least 1 size parameter (w,h,d) is greater than 0, then the trigger can only be fired if the player is intersecting the defined bounding cube (and if the their triggerEvent happens).  if a trigger's event requires a bounding cube but the bounding cube scale is 0,0,0, the trigger will probably break.
 
 # all valid trigger events:
 # onStart = fires the first time checkTriggers is called internally, and then never happens again.  does not require a bounding cube.
 # onEnter = fires only once when the player enters the trigger's bounding cube, and then can't be fired again until the player leaves the bounding cube.  requires a bounding cube.
-# onEnterRepeating = similar to onEnter, except that it fires every frame that the player is intersecting the bounding cube.  requires a bounding cube.
+# onEnterRepeat/onEnterRepeating = similar to onEnter, except that it fires every frame that the player is intersecting the bounding cube.  requires a bounding cube.
+# onExit = fires only once when the player leaves the trigger's bounding cube, and then can't be fired again until the player re-enters the bounding cube.  requires a bounding cube.
 
 # all valid trigger actions:
 
 # logToConsole
 	# logs every parameter to the console, first strings and then numbers, separated by commas.
+	# this could make things laggy if repeated every frame, and should probably only be used for debugging anyways
 
 # changeSetting
 	# changes a setting (any of the settings block settings) to a different value.  note that because walkmaps are generated ahead of time and not by the engine, changing some settings could result in weird behavior due to walkmaps being generated on different settings, or just won't do anything at all.  any "unsafe" or "useless" settings to change are marked as such below.
@@ -53,7 +55,7 @@
 			# 2 - stepHeight.  this is a useless settings and has no effect when changed.
 			# 3 - maxPlayerSpeed.
 			# 4 - heightSpeed.
-		# settingValue - the new value for the setting.
+		# settingValue - the new value for the setting.  should be a number
 	#
 
 # playBackgroundMusic
@@ -64,7 +66,13 @@
 		# loop - whether to loop the music when it ends or not.  valid vals = true/false
 	#
 
-
+# setBackgroundMusicSettings
+	# change background music volume/if it loops.
+	# parameters:
+		# volume - same as playBackgroundMusic
+		# loop - same as playBackgroundMusic
+	#
+	
 # basic world starts here...
 
 # texture initialization blocks
@@ -117,7 +125,6 @@ $[-4, 1.5, 1,     0, 90, 0,    1, 1, 1,    smiley]
 $[4, 0.65, 1,     -90, 180, 0,    3, 3, 3,    man]
 $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 
-
 # light blocks
 
 &[0, 3, 0,     1, 1, 1,    1, 0.072, 0.0175,     0.4, 0.8]
@@ -127,3 +134,15 @@ $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 
 # log something to console on start
 ![0,0,0,0,0,0, onStart, logToConsole, Hello, World]
+
+# play background music on start
+![0,0,0,0,0,0, onStart, playBackgroundMusic, ./res/sounds/stal.ogg, 10, true]
+
+# change height every time the player goes near the cesium man
+![3, 1.5, 1, 1, 2, 1, onEnter, changeSetting, 0, 4.25]
+![3, 1.5, 1, 1, 2, 1, onExit, changeSetting, 0, 2]
+
+# blast music every time the player goes near the smiley face
+# I don't recommend using this to create false spatial audio, since spatial audio exists.  background music should generally be non spatial
+![-4, 1.5, 0.95, 2.7, 2.7, 2.7, onEnter, setBackgroundMusicSettings, 80, true]
+![-4, 1.5, 0.95, 2.7, 2.7, 2.7, onExit, setBackgroundMusicSettings, 10, true]

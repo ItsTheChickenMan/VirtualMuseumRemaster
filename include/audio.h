@@ -20,9 +20,11 @@ void updateSounds();
 
 void updateListener(glm::vec3 position, glm::vec3 forward);
 
+void playBackgroundMusic(std::string filename, float volume, bool loop);
 void playBackgroundMusic(std::string filename, float volume);
 void playBackgroundMusic(std::string filename);
 void setBackgroundMusicVolume(float volume);
+void setBackgroundMusicLoop(bool loop);
 
 sf::Vector3<float> glmVecToSFML(glm::vec3 vec);
 

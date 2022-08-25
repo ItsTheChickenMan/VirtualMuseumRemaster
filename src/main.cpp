@@ -90,21 +90,18 @@ int main(int argc, char** argv){
 	// 8.823283, 7.303828, 8.691005, -0.615999, 3.887995, 0.000000
 	PerspectiveCamera* camera = createPerspectiveCamera(glm::vec3(0), glm::vec3(0), glm::radians(45.f), (float)screenWidth, (float)screenHeight, 0.1f, 100.f);
 	
-	// create scene objects
-	//RenderableObject* object = createRenderableObject(cubeData, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, glm::radians(90.0f), 0.0f), glm::vec3(1.0f));
+	// create player
+	Keymap keymap = (Keymap){ GLFW_KEY_W, GLFW_KEY_S, GLFW_KEY_A, GLFW_KEY_D, GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT, GLFW_KEY_E, GLFW_KEY_Q };
+	
+	Player* player = createPlayer(camera, keymap);
 	
 	// parse world
-	Scene* scene = createScene();
+	Scene* scene = createScene(player);
 	
 	// load any world/walkmap files from arguments
 	for(uint32_t i = 1; i < argc; i++){
 		parseWorldIntoScene(scene, argv[i]);
 	}
-	
-	// create player
-	Keymap keymap = (Keymap){ GLFW_KEY_W, GLFW_KEY_S, GLFW_KEY_A, GLFW_KEY_D, GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT, GLFW_KEY_E, GLFW_KEY_Q };
-	
-	Player* player = createPlayer(camera, keymap, scene);
 	
 	printf("Done\nRender Loop Starting\n");
 	

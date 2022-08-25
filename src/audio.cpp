@@ -113,7 +113,7 @@ void updateListener(glm::vec3 position, glm::vec3 forward){
 }
 
 // music //
-void playBackgroundMusic(std::string filename, float volume){
+void playBackgroundMusic(std::string filename, float volume, bool loop){
 	if(backgroundMusic.getStatus() != sf::Music::Stopped){
 		backgroundMusic.stop();
 	}
@@ -123,18 +123,26 @@ void playBackgroundMusic(std::string filename, float volume){
 		return;
 	}
 	
-	backgroundMusic.setLoop(true);
-	backgroundMusic.setVolume(volume);
+	setBackgroundMusicLoop(loop);
+	setBackgroundMusicVolume(volume);
 	
 	backgroundMusic.play();
 }
 
+void playBackgroundMusic(std::string filename, float volume){
+	playBackgroundMusic(filename, volume, true);
+}
+
 void playBackgroundMusic(std::string filename){
-	playBackgroundMusic(filename, 100.f);
+	playBackgroundMusic(filename, 100.f, true);
 }
 
 void setBackgroundMusicVolume(float volume){
 	backgroundMusic.setVolume(volume);
+}
+
+void setBackgroundMusicLoop(bool loop){
+	backgroundMusic.setLoop(loop);
 }
 
 // utils // 

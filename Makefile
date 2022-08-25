@@ -55,7 +55,7 @@ $(OBJ_DIR)glad.o: $(SRC_DIR)glad/glad.c $(INCLUDE_DIR)glad/glad.h
 $(OBJ_DIR)audio.o: $(SRC_DIR)audio.cpp $(INCLUDE_DIR)audio.h
 
 $(OBJ_DIR)engine.o: $(SRC_DIR)engine.cpp $(INCLUDE_DIR)engine.h $(INCLUDE_DIR)audio.h $(INCLUDE_DIR)camera.h $(INCLUDE_DIR)graphics.h $(INCLUDE_DIR)mouse.h $(INCLUDE_DIR)shader.h $(INCLUDE_DIR)texture.h $(INCLUDE_DIR)utils.h $(INCLUDE_DIR)world.h
-$(OBJ_DIR)world.o: $(SRC_DIR)world.cpp $(INCLUDE_DIR)world.h $(INCLUDE_DIR)graphics.h $(INCLUDE_DIR)lighting.h $(INCLUDE_DIR)texture.h $(INCLUDE_DIR)shapes.h $(INCLUDE_DIR)utils.h
+$(OBJ_DIR)world.o: $(SRC_DIR)world.cpp $(INCLUDE_DIR)world.h $(INCLUDE_DIR)graphics.h $(INCLUDE_DIR)lighting.h $(INCLUDE_DIR)texture.h $(INCLUDE_DIR)audio.h $(INCLUDE_DIR)shapes.h $(INCLUDE_DIR)utils.h
 
 $(OBJ_DIR)mouse.o: $(SRC_DIR)mouse.cpp $(INCLUDE_DIR)mouse.h $(INCLUDE_DIR)graphics.h
 $(OBJ_DIR)utils.o: $(SRC_DIR)utils.cpp $(INCLUDE_DIR)utils.h
