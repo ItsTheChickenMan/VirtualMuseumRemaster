@@ -7,6 +7,66 @@
 
 #include <stdexcept>
 
+// event types and action types are hard coded into the parser right here
+
+// this map is for event names -> their event checker functions (the functions which check if a TriggerInfo struct should be fired)
+// this should not be modified at all during runtime
+const std::map<std::string, EventCheckFunction> g_eventCheckers = {
+	{"onStart", onStartChecker},
+	{"onEnter", onEnterChecker},
+	{"onEnterRepeat", onEnterRepeatChecker},
+};
+
+// this map is for storing action methods for each action name
+const std::map<std::string, TriggerActionFunction> g_triggerActions = {
+	{"logToConsole", logToConsole},
+	{"changeSetting", changeSetting},
+	{"playBackgroundMusic", playBackgroundMusic}
+};
+
+
+// trigger management //
+
+// checker functions
+// syntax = eventNameChecker
+
+bool onStartChecker(Scene* scene, TriggerInfo* triggerInfo){
+	return scene->frame == 0;
+}
+
+bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo){
+	// this one will likely have an extra float value acting as a boolean which updates if the player has exited the bounding cube
+	
+	return false;
+}
+
+bool onEnterRepeatChecker(Scene* scene, TriggerInfo* triggerInfo){
+	// this one's easy; just check if the player is in the bounding cube or not
+	
+	return false;
+}
+
+// action functions
+void logToConsole(Scene* scene, TriggerInfo* triggerInfo){
+	for(uint32_t i = 0; i < triggerInfo->strings->size(); i++){
+		printf("%s, ", triggerInfo->strings->at(i).c_str());
+	}
+	
+	for(uint32_t i = 0; i < triggerInfo->numbers->size(); i++){
+		printf("%f, ", triggerInfo->numbers->at(i));
+	}
+	
+	printf("\n");
+}
+
+void changeSetting(Scene* scene, TriggerInfo* triggerInfo){
+}
+
+void playBackgroundMusic(Scene* scene, TriggerInfo* triggerInfo){
+}
+
+// others stuff //
+
 // textured object constructors
 
 // creates a textured renderable object from an existing object and an existing texture data
@@ -118,6 +178,7 @@ const char lightBlockDelimiter = '&';
 const char modelBlockDelimiter = '+';
 const char walkBoxBlockDelimiter = '~';
 const char settingsBlockDelimiter = '@';
+const char triggerBlockDelimiter = '!';
 
 // create a block
 Block* createBlock(){
@@ -367,13 +428,13 @@ void objectBlockToScene(Block* block, Scene* scene){
 }
 
 void lightBlockToScene(Block* block, Scene* scene){
-	// load values
-	
+	// validate size
 	if(block->numbers->size() < 11){
 		printf("Not enough parameters for light block (only %d numbers present)\n", block->numbers->size());
 		return;
 	}
 	
+	// load values
 	float x = block->numbers->at(0);
 	float y = block->numbers->at(1);
 	float z	= block->numbers->at(2);
@@ -432,7 +493,7 @@ void walkBoxBlockToScene(Block* block, Scene* scene){
 	// add adjacents
 	for(uint32_t i = 5; i < block->numbers->size(); i++){
 		// convert float to int index
-		uint32_t index = (uint32_t)block->numbers->at(i);
+		uint32_t index = (uint32_t)block->numbers->at(i) + scene->walkmapOffset;
 		
 		// add index to box adjacents
 		box->adjacent->push_back(index);
@@ -454,6 +515,84 @@ void settingsBlockToScene(Block* block, Scene* scene){
 	}
 }
 
+void triggerBlockToScene(Block* block, Scene* scene){
+	// validate size
+	uint32_t numNums = 6;
+	uint32_t numStrings = 2;
+	if(block->numbers->size() < 6 || block->strings->size() < 2){
+		printf("Not enough parameters in trigger block (only %d numbers and %d strings present when %d and %d were expected)\n", block->numbers->size(), block->strings->size(), numNums, numStrings);
+		return;
+	}
+	
+	// load float values
+	glm::vec3 position;
+	glm::vec3 scale;
+	
+	// first three floats should be position
+	for(uint32_t i = 0; i < 3; i++){
+		(&position.x)[i] = block->numbers->at(i);
+	}
+	
+	// next three floats should be scale
+	for(uint32_t i = 3; i < 6; i++){
+		(&scale.x)[i] = block->numbers->at(i);
+	}
+	
+	// load strings
+	std::string event = block->strings->at(0);
+	std::string action = block->strings->at(1);
+	
+	// check that event and action are valid
+	if(!g_eventCheckers.count(event)){
+		printf("Invalid event name %s\n", event.c_str());
+		
+		return;
+	}
+	
+	if(!g_triggerActions.count(action)){
+		printf("Invalid action name %s\n", action.c_str());
+		
+		return;
+	}
+	
+	// erase the rest of the strings/numbers
+	block->strings->erase( block->strings->begin(), block->strings->begin() + 2);
+	block->numbers->erase( block->numbers->begin(), block->numbers->begin() + 6);
+	
+	// create trigger info
+	TriggerInfo* info = createTriggerInfo(position, scale, block->strings, block->numbers, action);
+	
+	// store to scene triggers
+	
+	// construct vector for trigger if it doesn't exist
+	std::vector<TriggerInfo*>* triggers = (*scene->triggers)[event];
+	
+	if(!triggers){
+		triggers = new std::vector<TriggerInfo*>();
+		
+		(*scene->triggers)[event] = triggers;
+	}
+	
+	triggers->push_back(info);
+
+}
+
+// copies the elements from numbers and strings
+TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action){
+	// check that action exists before doing anything
+	
+	
+	TriggerInfo* info = allocateMemoryForType<TriggerInfo>();
+	
+	info->position = position;
+	info->scale = scale;
+	info->strings = new std::vector<std::string>( *strings );
+	info->numbers = new std::vector<float>( *numbers );
+	info->action = g_triggerActions.at(action); // FIXME: handle potential exception
+	
+	return info;
+}
+
 // create the shell of a scene
 Scene* createScene(){
 	// allocate memory
@@ -466,6 +605,9 @@ Scene* createScene(){
 	scene->staticObjects = new std::map<VertexData*, std::vector<TexturedRenderableObject*>*>();
 	scene->pointLights = new std::vector<PointLight*>();
 	scene->walkmap = new std::vector<BoundingBox*>();
+	scene->triggers = new std::map<std::string, std::vector<TriggerInfo*>*>();
+	scene->walkmapOffset = 0;
+	scene->frame = 0;
 	
 	// default settings
 	scene->playerHeight = 2.f;
@@ -488,7 +630,7 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	}
 	
 	// settings
-	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter, walkBoxBlockDelimiter, settingsBlockDelimiter};
+	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter, walkBoxBlockDelimiter, settingsBlockDelimiter, triggerBlockDelimiter};
 	
 	// control states
 	bool parsingBlock = false;
@@ -500,7 +642,7 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	// first param = pointer to block (void* here to be valid for all pointers)
 	// second param = char to parse
 	// returns false if the block hasn't finished parsing and true if it has
-	void (*blockParsers[7])(Block*,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene, walkBoxBlockToScene, settingsBlockToScene};
+	void (*blockParsers[8])(Block*,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene, walkBoxBlockToScene, settingsBlockToScene, triggerBlockToScene};
 	
 	// loop through each byte
 	char byte;
@@ -556,7 +698,7 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 		}
 		
 		// if a block is being parsed, pass the byte to the block parser function
-		bool done = blockCharParser(blockBuffer, byte);
+		bool done = (*blockCharParser)(blockBuffer, byte);
 		
 		if(done){
 			// parse block into scene
@@ -573,6 +715,9 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	free(fileBuffer);
 	
 	destroyBlock(blockBuffer);
+	
+	// update walkmap offset
+	scene->walkmapOffset = scene->walkmap->size();
 }
 
 // parse world
@@ -586,4 +731,29 @@ Scene* parseWorld(const char* file){
 
 bool hasWalkmap(Scene* scene){
 	return scene->walkmap->size() > 0;
+}
+
+// check triggers for scene
+void checkTriggers(Scene* scene){
+	// loop through every TriggerInfo
+	for(std::map<std::string, std::vector<TriggerInfo*>*>::iterator it = scene->triggers->begin(); it != scene->triggers->end(); it++){
+		// load checker function
+		EventCheckFunction checker = g_eventCheckers.at(it->first);
+		
+		// loop through every trigger of this event
+		for(uint32_t i = 0; i < it->second->size(); i++){
+			TriggerInfo* triggerInfo = it->second->at(i);
+			
+			// check if we need to fire this trigger
+			bool fire = (*checker)(scene, triggerInfo);
+			
+			if(fire){
+				// fire at will
+				(*triggerInfo->action)(scene, triggerInfo);
+			}
+		}
+	}
+	
+	// increment scene frame
+	scene->frame++;
 }

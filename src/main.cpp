@@ -94,14 +94,12 @@ int main(int argc, char** argv){
 	// create scene objects
 	//RenderableObject* object = createRenderableObject(cubeData, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, glm::radians(90.0f), 0.0f), glm::vec3(1.0f));
 	
-	const char* path = argc >= 2 ? argv[1] : "./res/worlds/basic.world";
-	const char* walkmapPath = argc >= 3 ? argv[2] : NULL;
-	
 	// parse world
-	Scene* scene = parseWorld(path);
+	Scene* scene = createScene();
 	
-	if(walkmapPath){
-		parseWorldIntoScene(scene, walkmapPath);
+	// load any world/walkmap files from arguments
+	for(uint32_t i = 1; i < argc; i++){
+		parseWorldIntoScene(scene, argv[i]);
 	}
 	
 	// create player
@@ -125,20 +123,14 @@ int main(int argc, char** argv){
 		//glm::vec3 movementVector = calculateMovementVector(window, camera);
 		
 		// update player position (works regardless of walkmap presence)
-		/*for (std::map<VertexData*, std::vector<TexturedRenderableObject*>*>::iterator it = scene->staticObjects->begin(); it != scene->staticObjects->end(); it++){
-
-			if(!it->second) continue;
-			
-			for(uint32_t i = 0; i < it->second->size(); i++){
-				it->second->at(i)->visible = false;
-			}
-		}*/
-		
 		updatePlayerPosition(player, scene, window, delta);
 		
 		rotateCamera(camera, rotationVector);
 		constrainCameraRotation(camera, glm::vec3(glm::radians(-89.f), NO_LB, NO_LB), glm::vec3(glm::radians(89.f), NO_UB, NO_UB));
 		//translateCamera(camera, movementVector);
+		
+		// check triggers
+		checkTriggers(scene);
 		
 		//printf("fr: %f\n", 1.0/delta);
 		//printf("camera: %f, %f, %f, %f, %f, %f\n", camera->position.x, camera->position.y, camera->position.z, camera->rotation.x, camera->rotation.y, camera->rotation.z);

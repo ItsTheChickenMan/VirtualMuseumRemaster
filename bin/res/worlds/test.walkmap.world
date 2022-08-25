@@ -1,6 +1,6 @@
 # texture initialization blocks
 
-%[./res/textures/test/grid.png, default]
+%[./res/textures/grid.png, default]
 
 # vertex data initialization blocks
 
@@ -9,6 +9,9 @@
 # light blocks
 
 &[0, 0, 0,     1, 1, 1,    1, 0, 0,     0.8, 0]
+
+# bbox object blocks
+
 $[-1.600000,-0.350000,6.062500,0,0,0,0.400000,0,1.875000,default,cube]
 $[-1.262500,-0.250000,6.062500,0,0,0,0.275000,0,1.875000,default,cube]
 $[-1.062500,-0.250000,6.562500,0,0,0,0.125000,0,0.875000,default,cube]

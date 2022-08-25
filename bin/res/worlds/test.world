@@ -3,13 +3,13 @@
 
 # texture initialization blocks
 
-%[./res/textures/test/grid.png, default]
+%[./res/textures/grid.png, default]
 %[./res/textures/oldmuseum/greyfloor.png, floor]
 %[./res/textures/oldmuseum/wall.png, wall]
 
 # vertex data initialization blocks
 
-*[cube, cube, 1, 1, 1]
+*[cube, cube, 0, 0, 0, 1, 1, 1]
 
 # light blocks
 # &[0, 0, 0,     1, 1, 1,    1, 0, 0,     1.0, 0]

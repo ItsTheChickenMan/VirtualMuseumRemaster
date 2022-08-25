@@ -1,15 +1,18 @@
 # basic world file
 # lines starting with hashtags are ignored when parsed
 
+# documentation:
 
-# blocks are any chars enclosed by two brackets and a delimiter character.  here are all valid blocks (* = optional):
+# blocks are any chars enclosed by two brackets and a delimiter character.  here are all valid blocks (* = optional, in reference to a parameter):
 
 # %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
 # *[shapeName, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
 # +[modelPath, modelName, x, y, z, w, h, d] = a special use block for initializing models.  models need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block.  the (x,y,z) and (w,h,d) parameters are for bounding box offset and size, but only need to be defined if using walkmaps (the full scale .world parser does not require these values)
 # $[x, y, z, y, p, r, w, h, d, *textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (not required if using a model, which load their own textures), and vertex data (or default)
 # &[x, y, z, r, g, b, c, l, q, ambientStrength, diffuseStrength] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), constant+linear+quadratic values for attenuation (c,l,q), and ambient + diffuse strength
-
+# ~[x, y, z, w, d, adjacents...] = walkmap box block.  defines walkable space in a world.  adjacents... are indexes to other adjacent bounding boxes.  usually these are in generated walkmaps and are not used in .world files, but it's still technically a valid block, and will still work to define walkable space in .world files.
+# @[playerHeight, playerRadius, stepHeight, maxPlayerSpeed, heightSpeed] = settings block, used to define general world settings.  if using a walkmap, this block will get overriden by the walkmap's settings block.  if not present, the scene defaults to: playerHeight = 2.f, playerRadius = 0.5f, stepHeight = 0.4f, maxPlayerSpeed = 2.f, heightSpeed = 0.1f
+# ![x, y, z, w, h, d, event, action, actionParams...] = a trigger block, which, for lack of a better explanation, can trigger things to happen.  more info on triggers is in the section below keywords.
 
 # some texture names have special meanings:
 
@@ -27,6 +30,41 @@
 # nowalk = add this as the last string parameter in an object block to have the walkmap generator ignore it.  this isn't a reserved texture name or vertex data name, but rather a special keyword meaning that textures and vertex data can still be named "nowalk" (if you really want to).  Think of this keyword like the opposite of the "invisible" keyword: this keyword makes the player not collide with things which are there, while invisible makes the player collide with things which aren't there.  These two keywords can be used together to control player collision with objects which might be hard to control otherwise, such as models which have hollow space.  A good example of this is with the archway below, which can't be adequately represented by the single bounding box created for it but can be adequately represented by 3 invisible objects.
 
 
+# more info on trigger blocks (or just "triggers"):
+
+# triggers allow certain predefined actions to occur on certain predefined events.  the events are usually centered around player interaction, but there are exceptions.  triggers are fired when their triggerEvent happens.  multiple triggers can be defined for a single event.  a trigger does not always need a bounding cube (the x,y,z,w,h,d parameters in trigger block), but if at least 1 size parameter (w,h,d) is greater than 0, then the trigger can only be fired if the player is intersecting the defined bounding cube (and if the their triggerEvent happens).  if a trigger's event requires a bounding cube, but it's not present, the parser ignores the trigger.
+
+# all valid trigger events:
+# onStart = fires the first time checkTriggers is called internally, and then never happens again.  does not require a bounding cube.
+# onEnter = fires only once when the player enters the trigger's bounding cube, and then can't be fired again until the player leaves the bounding cube.  requires a bounding cube.
+# onEnterRepeating = similar to onEnter, except that it fires every frame that the player is intersecting the bounding cube.  requires a bounding cube.
+
+# all valid trigger actions:
+
+# logToConsole
+	# logs every parameter to the console, first strings and then numbers, separated by commas.
+
+# changeSetting
+	# changes a setting (any of the settings block settings) to a different value.  note that because walkmaps are generated ahead of time and not by the engine, changing some settings could result in weird behavior due to walkmaps being generated on different settings, or just won't do anything at all.  any "unsafe" or "useless" settings to change are marked as such below.
+	# parameters:
+		# settingIndex - the zero based index of the setting to change.  valid options are:
+			# 0 - playerHeight.  this is an unsafe setting and can cause the player to look through objects above them or be prevented from going under objects they should fit under if this changes.
+			# 1 - playerRadius.  this is an useless setting and has no effect when changed.
+			# 2 - stepHeight.  this is a useless settings and has no effect when changed.
+			# 3 - maxPlayerSpeed.
+			# 4 - heightSpeed.
+		# settingValue - the new value for the setting.
+	#
+
+# playBackgroundMusic
+	# plays music in the background.  the music is a global sound not relative to the player.  only one track of background music can play at a time, so this will override whatever background music was already playing if there was any.
+	# parameters:
+		# path - the path to the track to play.  valid vals = any string with no whitespace.
+		# volume - the volume of the music.  valid vals = any float value in the range [0, 1]
+		# loop - whether to loop the music when it ends or not.  valid vals = true/false
+	#
+
+
 # basic world starts here...
 
 # texture initialization blocks
@@ -35,9 +73,11 @@
 %[./res/textures/oldmuseum/greyfloor.png, floor]
 %[./res/textures/oldmuseum/wall.png, wall]
 
+
 # vertex data initialization blocks
 
 *[cube, cube, 0, 0, 0, 1, 1, 1]
+
 
 # model blocks
 
@@ -45,6 +85,7 @@
 +[./res/models/SmilingFace.glb, smiley, 0, 0, -0.05, 1.7, 1.7, 1.7]
 +[./res/models/CesiumMan.glb, man, 0, 0, 0.75, 0.4, 1.15, 1.55]
 +[./res/models/archway.glb, archway, 0, 0, 0, 5, 1, 8]
+
 
 # object blocks
 
@@ -76,6 +117,13 @@ $[-4, 1.5, 1,     0, 90, 0,    1, 1, 1,    smiley]
 $[4, 0.65, 1,     -90, 180, 0,    3, 3, 3,    man]
 $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 
+
 # light blocks
 
 &[0, 3, 0,     1, 1, 1,    1, 0.072, 0.0175,     0.4, 0.8]
+
+
+# map logic (triggers)
+
+# log something to console on start
+![0,0,0,0,0,0, onStart, logToConsole, Hello, World]
