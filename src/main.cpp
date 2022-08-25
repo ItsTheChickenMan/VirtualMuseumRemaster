@@ -2,7 +2,6 @@
 
 #include <engine.h>
 #include <world.h>
-#include <walkmap.h>
 
 #include <cstdio>
 #include <cstdlib>

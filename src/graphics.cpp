@@ -4,8 +4,6 @@
 
 #include <graphics.h>
 #include <utils.h>
-#include <camera.h>
-#include <shader.h>
 
 #include <string>
 

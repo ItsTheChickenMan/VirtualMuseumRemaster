@@ -12,7 +12,6 @@
 #include <glm/ext.hpp>
 
 #include <camera.h>
-#include <utils.h>
 #include <shader.h>
 #include <texture.h>
 

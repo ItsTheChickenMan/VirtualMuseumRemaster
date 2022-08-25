@@ -26,16 +26,6 @@ typedef void (*TriggerActionFunction)(Scene*, TriggerInfo*);
 
 // structs //
 
-// textured renderable object
-struct TexturedRenderableObject {
-	TextureData* textureData;
-	glm::vec3 color; // color if texture data is null
-	
-	RenderableObject* renderableObject;
-	
-	bool visible; // used by scene to only render "visible" objects, usually for debugging
-};
-
 // 2d bounding box struct
 struct BoundingBox {
 	// position and size
@@ -47,6 +37,44 @@ struct BoundingBox {
 	
 	// adjacent bounding box indexes
 	std::vector<uint32_t>* adjacent;
+};
+
+// map of keys to certain controls
+struct Keymap {
+	int32_t forward;
+	int32_t backward;
+	int32_t left;
+	int32_t right;
+	
+	int32_t up;
+	int32_t down;
+	
+	int32_t slow;
+	int32_t fast;
+};
+
+struct Player {
+	// camera
+	PerspectiveCamera* camera;
+	
+	// map of keys corresponding to certain controls
+	Keymap keymap;
+	
+	// last bounding box the player was standing on
+	BoundingBox* currentBbox;
+	
+	// if the player is currently locked to an axis (by the edge of a bbox) then this is set to the axis, otherwise it's set to 0, 0
+	glm::vec2 lockAxis;
+};
+
+// textured renderable object
+struct TexturedRenderableObject {
+	TextureData* textureData;
+	glm::vec3 color; // color if texture data is null
+	
+	RenderableObject* renderableObject;
+	
+	bool visible; // used by scene to only render "visible" objects, usually for debugging
 };
 
 // contains information on a trigger, which is used to check if the trigger needs to be fired and gets passed to the actual action when the trigger is fired
@@ -64,6 +92,9 @@ struct TriggerInfo {
 // scene
 // contain static renderable objects
 struct Scene {
+	// player
+	Player* player;
+	
 	// loaded vertex data
 	std::map<std::string, VertexData*>* vertexData;
 	
@@ -130,6 +161,8 @@ void logToConsole(Scene* scene, TriggerInfo* triggerInfo);
 void changeSetting(Scene* scene, TriggerInfo* triggerInfo);
 void playBackgroundMusic(Scene* scene, TriggerInfo* triggerInfo);
 
+TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action);
+
 // other stuff
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, TextureData* texture);
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, glm::vec3 color);
@@ -142,7 +175,12 @@ BoundingBox* createBbox(glm::vec2 p, glm::vec2 s);
 BoundingBox* createBbox(glm::vec3 p, glm::vec2 s);
 BoundingBox* createBbox(BoundingBox* original);
 
-TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action);
+Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap, Scene* scene);
+glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed, double delta);
+BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double distance, double delta, uint32_t* iterations);
+void updatePlayerPosition(Player* player, Scene* scene, Window* window, double delta);
+
+bool bboxContains(BoundingBox* box, glm::vec2 point);
 
 Scene* createScene();
 void parseWorldIntoScene(Scene* scene, const char* file);
