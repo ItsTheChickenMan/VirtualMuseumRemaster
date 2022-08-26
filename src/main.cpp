@@ -96,7 +96,7 @@ int main(int argc, char** argv){
 	Player* player = createPlayer(camera, keymap);
 	
 	// parse world
-	Scene* scene = createScene(player);
+	Scene* scene = createScene(window, player);
 	
 	// load any world/walkmap files from arguments
 	for(uint32_t i = 1; i < argc; i++){

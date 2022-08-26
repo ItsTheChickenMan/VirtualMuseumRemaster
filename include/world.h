@@ -99,6 +99,9 @@ struct TriggerInfo {
 // scene
 // contain static renderable objects
 struct Scene {
+	// window
+	Window* window;
+	
 	// player
 	Player* player;
 	
@@ -167,6 +170,9 @@ bool onStartChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube)
 bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
 bool onEnterRepeatChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
 bool onExitChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
+bool onKeyPressChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
+bool onKeyHoldChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
+bool onKeyReleaseChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube);
 
 void logToConsole(Scene* scene, TriggerInfo* triggerInfo);
 void changeSetting(Scene* scene, TriggerInfo* triggerInfo);
@@ -196,9 +202,9 @@ glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed
 BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double distance, double delta, uint32_t* iterations);
 void updatePlayerPosition(Player* player, Scene* scene, Window* window, double delta);
 
-Scene* createScene(Player* player);
+Scene* createScene(Window* window, Player* player);
 void parseWorldIntoScene(Scene* scene, const char* file);
-Scene* parseWorld(const char* file, Player* player);
+Scene* parseWorld(const char* file, Window* window, Player* player);
 bool hasWalkmap(Scene* scene);
 void checkTriggers(Scene* scene);
 

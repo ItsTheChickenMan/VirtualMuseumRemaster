@@ -40,9 +40,9 @@
 # onEnter = fires only once when the player enters the trigger's bounding cube, and then can't be fired again until the player leaves the bounding cube.  requires a bounding cube.
 # onEnterRepeat/onEnterRepeating = similar to onEnter, except that it fires every frame that the player is intersecting the bounding cube.  requires a bounding cube.
 # onExit = fires only once when the player leaves the trigger's bounding cube, and then can't be fired again until the player re-enters the bounding cube.  requires a bounding cube.
-# onKeyPress = fires when the player presses a button defined in the trigger parameters.  only fires once when pressed, and then won't fire again until the player releases the button.  does not require a bounding cube.
-# onKeyHold = fires while the player is holding down a button defined in the trigger parameters.  does not require a bounding cube.
-# onKeyRelease = fires when the player releases a held button.  does not require a bounding cube.
+# onKeyPress = fires when the player presses a button defined in the trigger parameters.  only fires once when pressed, and then won't fire again until the player releases the button.  requires one parameter, which is the GLFW key code of the key.  does not require a bounding cube.
+# onKeyHold = fires while the player is holding down a button defined in the trigger parameters.  requires one parameter, which is the GLFW key code of the key.  does not require a bounding cube.
+# onKeyRelease = fires when the player releases a held button.  requires one parameter, which is the GLFW key code of the key.  does not require a bounding cube.
 
 # all valid trigger actions:
 # * = optional parameter
@@ -164,7 +164,7 @@ $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 ![0,0,0,0,0,0, onStart, playBackgroundMusic (./res/sounds/stal.ogg, 2, true)]
 
 # change height every time the player goes near the cesium man
-![3, 1.5, 1, 1, 2, 1, onEnter, changeSetting (0, 4.25)]
+![3, 1.5, 1, 1, 2, 1, onEnterRepeating, changeSetting (0, 4.25)]
 ![3, 1.5, 1, 1, 2, 1, onExit, changeSetting (0, 2)]
 
 # blast music every time the player goes near the smiley face
@@ -175,4 +175,5 @@ $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 # play a sound when the player touches the avocado
 ![0, 1.63, 4, 1.2, 1.2, 1.2, onEnter, playAudio (test1, 100, false, true)]
 
-![0,0,0,0,0,0, onKeyPress (41), changeSetting (0, 4.25)]
+![0,0,0,0,0,0, onKeyHold (84), changeSetting (0, 6)]
+![0,0,0,0,0,0, onKeyRelease (84), changeSetting (0, 2)]

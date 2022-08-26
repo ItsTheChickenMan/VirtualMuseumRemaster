@@ -24,7 +24,13 @@ const std::map<std::string, EventCheckFunction> g_eventCheckers = {
 	{"onEnterRepeat", onEnterRepeatChecker},
 	{"onEnterRepeating", onEnterRepeatChecker},
 	
-	{"onExit", onExitChecker}
+	{"onExit", onExitChecker},
+	
+	{"onKeyPress", onKeyPressChecker},
+	
+	{"onKeyHold", onKeyHoldChecker},
+	
+	{"onKeyRelease", onKeyReleaseChecker}
 };
 
 // this map is for storing action methods for each action name
@@ -78,7 +84,7 @@ bool onExitChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
 	// if this is the first frame, add some extra trigger related info to triggerInfo
 	if(scene->frame == 0){
 		// this value is equal to the last frame in which the player was intersecting the bounding box.  the trigger will never fire between two consecutive frames
-		triggerInfo->reserved->push_back(0.f);
+		triggerInfo->reserved->push_back(0);
 	}
 	
 	int32_t lastFrame = *triggerInfo->reserved->begin();
@@ -94,14 +100,49 @@ bool onExitChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
 	return false;
 }
 
-void onKeyPressChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
-}
-
-void onKeyHoldChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+bool onKeyPressChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+	// initialization
+	if(scene->frame == 0){
+		triggerInfo->reserved->push_back(0);
+	}
 	
+	int32_t lastFrame = *triggerInfo->reserved->begin();
+	
+	if(onKeyHoldChecker(scene, triggerInfo, inBoundingCube)){
+		// update last frame
+		*triggerInfo->reserved->begin() = (int32_t)scene->frame;
+		
+		// if this frame and the last press frame are consecutive, return false, otherwise return true
+		return scene->frame - lastFrame > 1;
+	}
+	
+	return false;
 }
 
-void onKeyReleaseChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+bool onKeyHoldChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+	// size check
+	if(triggerInfo->eventNumbers->size() < 1) return false;
+	
+	return glfwGetKey(scene->window->glfwWindow, (int32_t)triggerInfo->eventNumbers->at(0)) && inBoundingCube;
+}
+
+bool onKeyReleaseChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+	// initialization
+	if(scene->frame == 0){
+		triggerInfo->reserved->push_back(0);
+	}
+	
+	int32_t lastFrame = *triggerInfo->reserved->begin();
+	
+	if(!onKeyHoldChecker(scene, triggerInfo, inBoundingCube)){
+		// update last frame
+		*triggerInfo->reserved->begin() = (int32_t)scene->frame;
+		
+		// if this frame and the last press frame are consecutive, return false, otherwise return true
+		return scene->frame - lastFrame > 1;
+	}
+	
+	return false;
 }
 
 
@@ -928,6 +969,8 @@ void triggerBlockToScene(Block* block, Scene* scene){
 		
 		eventStringParameters = eventParametersBlock->strings;
 		eventNumberParameters = eventParametersBlock->numbers;
+		
+		actionsIndex++;
 	}
 	
 	std::string action = block->strings->at(actionsIndex);
@@ -1010,11 +1053,12 @@ TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<
 
 // create the shell of a scene
 // also initializes player currentBbox
-Scene* createScene(Player* player){
+Scene* createScene(Window* window, Player* player){
 	// allocate memory
 	Scene* scene = allocateMemoryForType<Scene>();
 	
 	// initialize values
+	scene->window = window;
 	scene->player = player;
 	scene->vertexData = new std::map<std::string, VertexData*>();
 	scene->textures = new std::map<std::string, TextureData*>();
@@ -1152,8 +1196,8 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 }
 
 // parse world
-Scene* parseWorld(const char* file, Player* player){
-	Scene* scene = createScene(player);
+Scene* parseWorld(const char* file, Window* window, Player* player){
+	Scene* scene = createScene(window, player);
 	
 	parseWorldIntoScene(scene, file);
 	
