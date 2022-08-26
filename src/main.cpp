@@ -125,6 +125,9 @@ int main(int argc, char** argv){
 		constrainCameraRotation(camera, glm::vec3(glm::radians(-89.f), NO_LB, NO_LB), glm::vec3(glm::radians(89.f), NO_UB, NO_UB));
 		//translateCamera(camera, movementVector);
 		
+		// update sound listener position
+		updateListener(player->camera->position, player->camera->forward);
+		
 		// check triggers
 		checkTriggers(scene);
 		

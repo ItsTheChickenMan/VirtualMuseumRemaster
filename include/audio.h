@@ -15,7 +15,7 @@ bool loadSoundFileBatch(std::string filenames[], std::string keys[], uint32_t co
 
 sf::Sound* createSound(std::string key);
 void playSound(std::string key);
-void playSound(std::string key, glm::vec3 position);
+void playSound(sf::Sound* sound);
 void updateSounds();
 
 void updateListener(glm::vec3 position, glm::vec3 forward);

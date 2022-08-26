@@ -82,8 +82,15 @@ struct TriggerInfo {
 	glm::vec3 position;
 	glm::vec3 scale;
 	
+	// string/number parameters for the event (or the checker)
+	std::vector<std::string>* eventStrings;
+	std::vector<float>* eventNumbers;
+	
 	std::vector<std::string>* strings;
 	std::vector<float>* numbers;
+	
+	// reserved data for any use that the particular type of TriggerInfo needs
+	std::vector<int32_t>* reserved;
 	
 	// the action that this trigger fires
 	TriggerActionFunction action;
@@ -148,6 +155,9 @@ struct Block {
 	
 	// string buffer for parameter
 	std::string* parameterBuffer;
+	
+	// parsing subparameters or not (then it needs to ignore comma)
+	bool parsingSubparameters;
 };
 
 // methods //
@@ -162,8 +172,9 @@ void logToConsole(Scene* scene, TriggerInfo* triggerInfo);
 void changeSetting(Scene* scene, TriggerInfo* triggerInfo);
 void playBackgroundMusicAction(Scene* scene, TriggerInfo* triggerInfo);
 void setBackgroundMusicSettings(Scene* scene, TriggerInfo* triggerInfo);
+void playAudio(Scene* scene, TriggerInfo* triggerInfo);
 
-TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action);
+TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* eventStrings, std::vector<float>* eventNumbers, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action);
 
 // other stuff
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, TextureData* texture);

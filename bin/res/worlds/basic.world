@@ -8,11 +8,12 @@
 # %[texturePath, textureName] = a special use block for initializing textures.  textures need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
 # *[shapeName, vertexDataName] = a special use block for initializing vertex data.  vertex data needs to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block
 # +[modelPath, modelName, x, y, z, w, h, d] = a special use block for initializing models.  models need to be loaded and given names in order to be referenced by other blocks, so this block should exist before any reference to it by another block.  the (x,y,z) and (w,h,d) parameters are for bounding box offset and size, but only need to be defined if using walkmaps (the full scale .world parser does not require these values)
+# .[audioPath, audioName] = a special use block for initializing audio files.  audio needs to be loaded and given a name in order to be referenced by other blocks, so this block should exist before any reference to it by another block.  this does not need to be used to initialize background music (that's streamed straight from source)
 # $[x, y, z, y, p, r, w, h, d, *textureName, vertexDataName] = object block.  creates a new object with the given coordinates (x,y,z), rotation (y,p,r), size (w,h,d), texture (not required if using a model, which load their own textures), and vertex data (or default)
 # &[x, y, z, r, g, b, c, l, q, ambientStrength, diffuseStrength] = light block.  creates a point light with the given coordinates (x,y,z), color (r,g,b), constant+linear+quadratic values for attenuation (c,l,q), and ambient + diffuse strength
 # ~[x, y, z, w, d, adjacents...] = walkmap box block.  defines walkable space in a world.  adjacents... are indexes to other adjacent bounding boxes.  usually these are in generated walkmaps and are not used in .world files, but it's still technically a valid block, and will still work to define walkable space in .world files.
 # @[playerHeight, playerRadius, stepHeight, maxPlayerSpeed, heightSpeed] = settings block, used to define general world settings.  if using a walkmap, this block will get overriden by the walkmap's settings block.  if not present, the scene defaults to: playerHeight = 2.f, playerRadius = 0.5f, stepHeight = 0.4f, maxPlayerSpeed = 2.f, heightSpeed = 0.1f
-# ![x, y, z, w, h, d, event, action, actionParams...] = a trigger block, which, for lack of a better explanation, can trigger things to happen.  more info on triggers is in the section below keywords.
+# ![x, y, z, w, h, d, event (eventParams...), action (actionParams...)] = a trigger block, which, for lack of a better explanation, can trigger things to happen.  more info on triggers is in the section below keywords.  note that the lack of separator between event and (eventParams...) is not accidental.  There should be no separator between the parameters of the event and the parameters of the action, and both sets of parameters should be wrapped in parenthesis.  This is to differentiate between the two lists, because the parser only interprets parameters as 2 separate lists of strings and numbers, which is difficult to work with when considering two boundless sets of strings/numbers in the same block.
 
 # some texture names have special meanings:
 
@@ -35,34 +36,42 @@
 # triggers allow certain predefined actions to occur on certain predefined events.  the events are usually centered around player interaction, but there are exceptions.  triggers are fired when their triggerEvent happens.  multiple triggers can be defined for a single event.  a trigger does not always need a bounding cube (the x,y,z,w,h,d parameters in trigger block), but if at least 1 size parameter (w,h,d) is greater than 0, then the trigger can only be fired if the player is intersecting the defined bounding cube (and if the their triggerEvent happens).  if a trigger's event requires a bounding cube but the bounding cube scale is 0,0,0, the trigger will probably break.
 
 # all valid trigger events:
-# onStart = fires the first time checkTriggers is called internally, and then never happens again.  does not require a bounding cube.
+# onStart = fires the first time checkTriggers is called internally, and then never fires again.  does not require a bounding cube.
 # onEnter = fires only once when the player enters the trigger's bounding cube, and then can't be fired again until the player leaves the bounding cube.  requires a bounding cube.
 # onEnterRepeat/onEnterRepeating = similar to onEnter, except that it fires every frame that the player is intersecting the bounding cube.  requires a bounding cube.
 # onExit = fires only once when the player leaves the trigger's bounding cube, and then can't be fired again until the player re-enters the bounding cube.  requires a bounding cube.
+# onKeyPress = fires when the player presses a button defined in the trigger parameters.  only fires once when pressed, and then won't fire again until the player releases the button.  does not require a bounding cube.
+# onKeyHold = fires while the player is holding down a button defined in the trigger parameters.  does not require a bounding cube.
+# onKeyRelease = fires when the player releases a held button.  does not require a bounding cube.
 
 # all valid trigger actions:
+# * = optional parameter
+
+# -- misc/debug --
 
 # logToConsole
 	# logs every parameter to the console, first strings and then numbers, separated by commas.
 	# this could make things laggy if repeated every frame, and should probably only be used for debugging anyways
 
 # changeSetting
-	# changes a setting (any of the settings block settings) to a different value.  note that because walkmaps are generated ahead of time and not by the engine, changing some settings could result in weird behavior due to walkmaps being generated on different settings, or just won't do anything at all.  any "unsafe" or "useless" settings to change are marked as such below.
+	# changes a setting (any of the settings block settings) to a different value.  note that because walkmaps are generated ahead of time and not by the engine, changing some settings could result in weird behavior if the walkmap was generated on different settings, or just won't do anything at all.  any "unsafe" or "useless" settings to change are marked as such below.
 	# parameters:
-		# settingIndex - the zero based index of the setting to change.  valid options are:
+		# settingIndex - the zero based index of the setting to change.  valid vals are:
 			# 0 - playerHeight.  this is an unsafe setting and can cause the player to look through objects above them or be prevented from going under objects they should fit under if this changes.
 			# 1 - playerRadius.  this is an useless setting and has no effect when changed.
 			# 2 - stepHeight.  this is a useless settings and has no effect when changed.
 			# 3 - maxPlayerSpeed.
 			# 4 - heightSpeed.
-		# settingValue - the new value for the setting.  should be a number
+		# settingValue - the new value for the setting.  valid vals = any float value
 	#
+
+# -- audio related --
 
 # playBackgroundMusic
 	# plays music in the background.  the music is a global sound not relative to the player.  only one track of background music can play at a time, so this will override whatever background music was already playing if there was any.
 	# parameters:
 		# path - the path to the track to play.  valid vals = any string with no whitespace.
-		# volume - the volume of the music.  valid vals = any float value in the range [0, 1]
+		# volume - the volume of the music.  valid vals = any float value in the range [0, 100]
 		# loop - whether to loop the music when it ends or not.  valid vals = true/false
 	#
 
@@ -72,6 +81,18 @@
 		# volume - same as playBackgroundMusic
 		# loop - same as playBackgroundMusic
 	#
+
+# playAudio
+	# plays a sound loaded with an audio block, which can be spatial if desired.
+	# if spatial, the position of the trigger is used as the position of the audio.
+	# parameters:
+		# name - the name of the audio file (as loaded in the audio block) to play.  valid vals = any string with no whitespace that's a valid name for an audio file loaded by an audio block.
+		# volume - the volume of the audio file.  valid vals = any float value in the range [0, 100]
+		# loop - whether to loop the sound when it ends or not.  valid vals = true/false
+		# spatial - whether the audio is spatial (depends on trigger position) or not.  if it is, the position is based off of the trigger position.  valid vals = true/false
+		# attenuation* - attenuation value, see SFML documentation for info.  valid vals = any float value >= 0
+		# minDistance* - minimum distance, see SFML documentation for info.  valid vals = any float value > 0 (=0 is forbidden by SFML)
+		
 	
 # basic world starts here...
 
@@ -80,6 +101,10 @@
 %[./res/textures/default.png, default]
 %[./res/textures/oldmuseum/greyfloor.png, floor]
 %[./res/textures/oldmuseum/wall.png, wall]
+
+# audio blocks
+
+.[./res/sounds/test1.ogg, test1]
 
 
 # vertex data initialization blocks
@@ -133,16 +158,21 @@ $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 # map logic (triggers)
 
 # log something to console on start
-![0,0,0,0,0,0, onStart, logToConsole, Hello, World]
+![0,0,0,0,0,0, onStart, logToConsole (Hello, World)]
 
 # play background music on start
-![0,0,0,0,0,0, onStart, playBackgroundMusic, ./res/sounds/stal.ogg, 10, true]
+![0,0,0,0,0,0, onStart, playBackgroundMusic (./res/sounds/stal.ogg, 2, true)]
 
 # change height every time the player goes near the cesium man
-![3, 1.5, 1, 1, 2, 1, onEnter, changeSetting, 0, 4.25]
-![3, 1.5, 1, 1, 2, 1, onExit, changeSetting, 0, 2]
+![3, 1.5, 1, 1, 2, 1, onEnter, changeSetting (0, 4.25)]
+![3, 1.5, 1, 1, 2, 1, onExit, changeSetting (0, 2)]
 
 # blast music every time the player goes near the smiley face
-# I don't recommend using this to create false spatial audio, since spatial audio exists.  background music should generally be non spatial
-![-4, 1.5, 0.95, 2.7, 2.7, 2.7, onEnter, setBackgroundMusicSettings, 80, true]
-![-4, 1.5, 0.95, 2.7, 2.7, 2.7, onExit, setBackgroundMusicSettings, 10, true]
+# I don't recommend using this to create false spatial audio, since real spatial audio is supported.
+![-4, 1.5, 0.95, 2.7, 2.7, 2.7, onEnter, setBackgroundMusicSettings (40, true)]
+![-4, 1.5, 0.95, 2.7, 2.7, 2.7, onExit, setBackgroundMusicSettings (2, true)]
+
+# play a sound when the player touches the avocado
+![0, 1.63, 4, 1.2, 1.2, 1.2, onEnter, playAudio (test1, 100, false, true)]
+
+![0,0,0,0,0,0, onKeyPress (41), changeSetting (0, 4.25)]

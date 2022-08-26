@@ -62,6 +62,7 @@ sf::Sound* createSound(std::string key){
 }
 
 // create and play a sound
+// note that the memory pointed to by the returned pointer is deleted immediately when the sound stops playing.
 void playSound(std::string key){
 	sf::Sound* sound = createSound(key);
 	
@@ -72,16 +73,10 @@ void playSound(std::string key){
 	soundManager.push_back(sound);
 }
 
-// create and play a sound at a certain position
-// should be used if the position is static (set once and never changed)
-void playSound(std::string key, glm::vec3 position){
-	sf::Sound* sound = createSound(key);
-	
+// plays an already created sound
+// this might be handy for changing sound settings before playing it (after playing it, any pointers to the sound become risky)
+void playSound(sf::Sound* sound){
 	if(sound == NULL) return;
-	
-	// set relative and assign position
-	sound->setRelativeToListener(true);
-	sound->setPosition(glmVecToSFML(position));
 	
 	sound->play();
 	

@@ -32,7 +32,8 @@ const std::map<std::string, TriggerActionFunction> g_triggerActions = {
 	{"logToConsole", logToConsole},
 	{"changeSetting", changeSetting},
 	{"playBackgroundMusic", playBackgroundMusicAction},
-	{"setBackgroundMusicSettings", setBackgroundMusicSettings}
+	{"setBackgroundMusicSettings", setBackgroundMusicSettings},
+	{"playAudio", playAudio}
 };
 
 
@@ -50,16 +51,15 @@ bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube)
 	// if this is the first frame, add some extra trigger related info to triggerInfo
 	// this shouldn't cause any issues because triggers can't be created dynamically, so all valid triggers should be checked on the first checkTriggers call
 	if(scene->frame == 0){
-		// add extra float value to determine state of trigger
 		// this value is equal to the last frame in which the player was intersecting the bounding box.  the trigger will never fire between two consecutive frames
-		triggerInfo->numbers->push_back(0.f);
+		triggerInfo->reserved->push_back(0);
 	}
 	
-	int32_t lastFrame = (int32_t)(*(triggerInfo->numbers->end()-1));
+	int32_t lastFrame = *triggerInfo->reserved->begin();
 	
 	if(inBoundingCube){
 		// update last frame
-		*(triggerInfo->numbers->end()-1) = (float)scene->frame;
+		*triggerInfo->reserved->begin() = (int32_t)scene->frame;
 		
 		// if this frame and the last intersection frame are consecutive, return false, otherwise return true
 		return scene->frame - lastFrame > 1;
@@ -77,22 +77,31 @@ bool onExitChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
 	
 	// if this is the first frame, add some extra trigger related info to triggerInfo
 	if(scene->frame == 0){
-		// add extra float value to determine state of trigger
 		// this value is equal to the last frame in which the player was intersecting the bounding box.  the trigger will never fire between two consecutive frames
-		triggerInfo->numbers->push_back(0.f);
+		triggerInfo->reserved->push_back(0.f);
 	}
 	
-	int32_t lastFrame = (int32_t)(*(triggerInfo->numbers->end()-1));
+	int32_t lastFrame = *triggerInfo->reserved->begin();
 	
 	if(!inBoundingCube){
 		// update last frame
-		*(triggerInfo->numbers->end()-1) = (float)scene->frame;
+		*triggerInfo->reserved->begin() = (int32_t)scene->frame;
 		
 		// if this frame and the last intersection frame are consecutive, return false, otherwise return true
 		return scene->frame - lastFrame > 1;
 	}
 	
 	return false;
+}
+
+void onKeyPressChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+}
+
+void onKeyHoldChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+	
+}
+
+void onKeyReleaseChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
 }
 
 
@@ -162,6 +171,42 @@ void setBackgroundMusicSettings(Scene* scene, TriggerInfo* triggerInfo){
 	
 	setBackgroundMusicLoop(loop);
 	setBackgroundMusicVolume(volume);
+}
+
+void playAudio(Scene* scene, TriggerInfo* triggerInfo){
+	// validate size
+	if(triggerInfo->strings->size() < 3 || triggerInfo->numbers->size() < 1){
+		return;
+	}
+	
+	// load vals
+	std::string key = triggerInfo->strings->at(0);
+	float volume = triggerInfo->numbers->at(0);
+	bool loop = triggerInfo->strings->at(1) == "true";
+	bool spatial = triggerInfo->strings->at(2) == "true";
+	
+	// create a new sound
+	sf::Sound* sound = createSound(key);
+	
+	if(sound == NULL) return;
+	
+	// update settings
+	sound->setVolume(volume);
+	sound->setLoop(loop);
+	
+	if(spatial){
+		// load vals
+		float attenuation = triggerInfo->numbers->size() > 1 ? triggerInfo->numbers->at(1) : 0.5f;
+		float minDistance = triggerInfo->numbers->size() > 2 ? triggerInfo->numbers->at(2) : 1.f;
+		
+		sound->setPosition( glmVecToSFML(triggerInfo->position) );
+		sound->setAttenuation(attenuation);
+		sound->setMinDistance(minDistance);
+	} else {
+		sound->setRelativeToListener(true);
+	}
+	
+	playSound(sound);
 }
 
 // others stuff //
@@ -444,6 +489,7 @@ const char blockOpen = '[';
 const char blockClose = ']';
 const char textureBlockDelimiter = '%';
 const char vertexDataBlockDelimiter = '*';
+const char audioBlockDelimiter = '.';
 const char objectBlockDelimiter = '$';
 const char lightBlockDelimiter = '&';
 const char modelBlockDelimiter = '+';
@@ -461,6 +507,7 @@ Block* createBlock(){
 	block->parameterBuffer = new std::string();
 	
 	block->parameterIndex = 0;
+	block->parsingSubparameters = false;
 	
 	return block;
 }
@@ -476,6 +523,8 @@ void emptyBlock(Block* block){
 	
 	// reset parameter index
 	block->parameterIndex = 0;
+	
+	block->parsingSubparameters = false;
 }
 
 // completely deletes occupied memory
@@ -496,15 +545,37 @@ bool blockCharParser(Block* block, char byte){
 		return false;
 	}
 	
+	if(byte == '('){
+		// prevent parameter buffer from flushing early
+		block->parsingSubparameters = true;
+	} else if(byte == ')'){
+		// reenable flushing
+		block->parsingSubparameters = false;
+	}
+	
 	// add byte to parameter buffer if it's not equal to the parameter delimiter or the close block
-	if(byte != parameterDelimiter && byte != blockClose){
+	if( (byte != parameterDelimiter && byte != blockClose) || block->parsingSubparameters ){
 		block->parameterBuffer->push_back(byte);
 	} else {
 		// flush parameter buffer
 		if(block->parameterBuffer->length() > 0 && isStringNumber( *block->parameterBuffer )){
 			block->numbers->push_back( std::stof(*block->parameterBuffer) );
 		} else {
-			block->strings->push_back( *block->parameterBuffer );
+			// if string contains parenthesis, the parenthesis indicate sub-parameters
+			// split the string at the first parenthesis, and push as two separate strings
+			std::string::size_type parenthesisIndex = block->parameterBuffer->find_first_of('(');
+			
+			// found
+			if(parenthesisIndex != std::string::npos){
+				// push separately
+				std::string original = block->parameterBuffer->substr(0, parenthesisIndex);
+				std::string subparameters = block->parameterBuffer->substr(parenthesisIndex);
+				
+				block->strings->push_back(original);
+				block->strings->push_back(subparameters);
+			} else {
+				block->strings->push_back( *block->parameterBuffer );
+			}
 		}
 		
 		// reset parameterBuffer
@@ -522,6 +593,26 @@ bool blockCharParser(Block* block, char byte){
 	
 	return false;
 }
+
+// utility method to parse a block string into a block
+// it's expected that the string is a single block ( [x,y,z,etc...] ), no delimiter
+Block* parseStringToBlock(std::string blockString){
+	Block* block = createBlock();
+	
+	uint32_t byteIndex = 1; // skip block open byte
+	
+	while(byteIndex < blockString.size()){
+		char byte = blockString[byteIndex];
+		byteIndex++;
+		
+		if(isspace(byte)) continue;
+		
+		blockCharParser(block, byte);
+	}
+	
+	return block;
+}
+
 
 // block to scene methods
 void textureBlockToScene(Block* block, Scene* scene){
@@ -664,7 +755,7 @@ void objectBlockToScene(Block* block, Scene* scene){
 					texture = def;
 					printf(", reverting to default\n");
 				} else {
-					printf("Invalid texture name %s with no default present\n");
+					printf(" with no default present\n");
 					
 					return; // fail
 				}
@@ -790,7 +881,7 @@ void triggerBlockToScene(Block* block, Scene* scene){
 	// validate size
 	uint32_t numNums = 6;
 	uint32_t numStrings = 2;
-	if(block->numbers->size() < 6 || block->strings->size() < 2){
+	if(block->numbers->size() < numNums || block->strings->size() < numStrings){
 		printf("Not enough parameters in trigger block (only %d numbers and %d strings present when %d and %d were expected)\n", block->numbers->size(), block->strings->size(), numNums, numStrings);
 		return;
 	}
@@ -811,27 +902,54 @@ void triggerBlockToScene(Block* block, Scene* scene){
 	
 	// load strings
 	std::string event = block->strings->at(0);
-	std::string action = block->strings->at(1);
 	
-	// check that event and action are valid
+	// check that event is valid
 	if(!g_eventCheckers.count(event)){
 		printf("Invalid event name %s\n", event.c_str());
 		
 		return;
 	}
 	
+	// null unless there are event parameters
+	Block* eventParametersBlock = NULL;
+	std::vector<std::string>* eventStringParameters = NULL;
+	std::vector<float>* eventNumberParameters = NULL;
+	
+	uint32_t actionsIndex = 1;
+	
+	// check for subparameters
+	if(block->strings->at(1)[0] == '('){
+		std::string eventParametersString = block->strings->at(1);
+		
+		// replace parenthesis with blockClose, to parse normally
+		eventParametersString[eventParametersString.size()-1] = blockClose;
+		
+		eventParametersBlock = parseStringToBlock(eventParametersString);
+		
+		eventStringParameters = eventParametersBlock->strings;
+		eventNumberParameters = eventParametersBlock->numbers;
+	}
+	
+	std::string action = block->strings->at(actionsIndex);
+	
+	// check that action is valid
 	if(!g_triggerActions.count(action)){
 		printf("Invalid action name %s\n", action.c_str());
 		
 		return;
 	}
 	
-	// erase the rest of the strings/numbers
-	block->strings->erase( block->strings->begin(), block->strings->begin() + 2);
-	block->numbers->erase( block->numbers->begin(), block->numbers->begin() + 6);
+	// get action subparameters
+	std::string actionParametersString = block->strings->at(actionsIndex+1);
+	
+	// replace parenthesis with blockOpen/blockClose, to parse normally
+	actionParametersString[actionParametersString.size()-1] = blockClose;
+	
+	Block* actionParametersBlock = parseStringToBlock(actionParametersString);
 	
 	// create trigger info
-	TriggerInfo* info = createTriggerInfo(position, scale, block->strings, block->numbers, action);
+	// copies values from vectors, so no worries about bad memory here
+	TriggerInfo* info = createTriggerInfo(position, scale, eventStringParameters, eventNumberParameters, actionParametersBlock->strings, actionParametersBlock->numbers, action);
 	
 	// store to scene triggers
 	
@@ -845,11 +963,32 @@ void triggerBlockToScene(Block* block, Scene* scene){
 	}
 	
 	triggers->push_back(info);
+	
+	// destroy blocks
+	if(eventParametersBlock != NULL){
+		destroyBlock(eventParametersBlock); // also destroys vectors
+	}
+	
+	destroyBlock(actionParametersBlock);
+}
 
+void audioBlockToScene(Block* block, Scene* scene){
+	// validate size
+	uint32_t numStrings = 2;
+	if(block->strings->size() < numStrings){
+		printf("Not enough parameters for audio block (only %d strings present when %d were expected)\n", block->strings->size(), numStrings);
+		return;
+	}
+	
+	// load audio
+	std::string path = block->strings->at(0);
+	std::string name = block->strings->at(1);
+	
+	loadSoundFile(path, name);
 }
 
 // copies the elements from numbers and strings
-TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action){
+TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* eventStrings, std::vector<float>* eventNumbers, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action){
 	// check that action exists before doing anything
 	if(!g_triggerActions.count(action)){
 		printf("Invalid action %s for trigger info\n", action.c_str());
@@ -859,9 +998,12 @@ TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<
 	
 	info->position = position;
 	info->scale = scale;
+	info->eventStrings = eventStrings == NULL ? new std::vector<std::string>() : new std::vector<std::string>( *eventStrings );
+	info->eventNumbers = eventNumbers == NULL ? new std::vector<float>() : new std::vector<float>( *eventNumbers );
 	info->strings = new std::vector<std::string>( *strings );
 	info->numbers = new std::vector<float>( *numbers );
-	info->action = g_triggerActions.at(action); // FIXME: handle potential exception
+	info->reserved = new std::vector<int32_t>();
+	info->action = g_triggerActions.at(action);
 	
 	return info;
 }
@@ -905,7 +1047,7 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	}
 	
 	// settings
-	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter, walkBoxBlockDelimiter, settingsBlockDelimiter, triggerBlockDelimiter};
+	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter, walkBoxBlockDelimiter, settingsBlockDelimiter, triggerBlockDelimiter, audioBlockDelimiter};
 	
 	// control states
 	bool parsingBlock = false;
@@ -913,11 +1055,8 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	int32_t blockParsing = -1;
 	Block* blockBuffer = createBlock();
 	
-	// pointers to char parsers
-	// first param = pointer to block (void* here to be valid for all pointers)
-	// second param = char to parse
-	// returns false if the block hasn't finished parsing and true if it has
-	void (*blockParsers[8])(Block*,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene, walkBoxBlockToScene, settingsBlockToScene, triggerBlockToScene};
+	// block parsers
+	void (*blockParsers[9])(Block*,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene, walkBoxBlockToScene, settingsBlockToScene, triggerBlockToScene, audioBlockToScene};
 	
 	// loop through each byte
 	char byte;
@@ -948,7 +1087,7 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 		if(isspace(byte)) continue;
 		
 		// check for hashtag (comment, ignores)
-		if( (lastByte == '\n' || index == 0) && byte == commentDelimiter){
+		if( byte == commentDelimiter ){
 			ignoringUntilNextLine = true;
 			continue;
 		}
