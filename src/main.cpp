@@ -35,6 +35,9 @@ int main(int argc, char** argv){
 	uint32_t screenHeight = 720;
 	//uint32_t screenHeight = 600;
 	
+	float xSensitivity = 1;
+	float ySensitivity = 1;
+	
 	Window* window = createWindow(screenWidth, screenHeight, "Virtual Museum Remastered");
 	
 	// make sure it exists
@@ -43,7 +46,7 @@ int main(int argc, char** argv){
 		exit(EXIT_FAILURE);
 	}
 	
-	initMouseManager(window);
+	initMouseManager(window, xSensitivity, ySensitivity);
 	
 	printf("Done\nLoading shaders...");
 	

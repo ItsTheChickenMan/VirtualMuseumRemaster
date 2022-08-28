@@ -8,7 +8,7 @@
 #include <glm/glm.hpp>
 
 // methods //
-void initMouseManager(Window* window);
+void initMouseManager(Window* window, float xsens, float ysens);
 glm::vec2 getMousePosition();
 glm::vec2 getMouseDelta();
 void resetMouseDelta();
