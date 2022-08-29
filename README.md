@@ -4,6 +4,8 @@ The intent of this project is to remaster the project I completed in April of 20
 
 Also, I realize that this is more of remake than a remaster, but I'm 3 weeks into the project at the time of writing and I don't feel like changing the name.
 
+Date Started: 8/03/22 (? maybe earlier)
+
 ## Prompt
 
 The exact prompt for the project was as follows:

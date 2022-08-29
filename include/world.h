@@ -24,7 +24,7 @@ typedef bool (*EventCheckFunction)(Scene*, TriggerInfo*, bool);
 typedef void (*TriggerActionFunction)(Scene*, TriggerInfo*);
 
 
-// structs //
+// structs & unions //
 
 // 2d bounding box struct
 struct BoundingBox {
@@ -139,11 +139,34 @@ struct Scene {
 	float maxPlayerSpeed;
 	
 	// the rate at which updatePlayerPosition should approach the desired height
+	
+	// the rate at which updatePlayerPosition should approach the desired height
 	// the formula for the player height given a desired height is:
-	// currentHeight + (desiredHeight - currentHeight)*heightSpeed
-	// the range of this number should be (0, 1]
-	// a range of 1 is the same as matching the desiredHeight instantly each frame
+	// currentHeight + (desiredHeight - currentHeight) * min(heightSpeed*delta, 1)
+	// note that the delta correction isn't perfect and results in slightly faster speeds as framerate increases, and is only noticeable wrong at really low framerates (less than 5 fps).  At reasonable height speeds and reasonable frame rates, the difference is negligible (<0.5 seconds to reach desired height)
+	// the delta correction results in heightSpeed's units being approximately percentage / second, so I advise taking that into consideration when aiming for a good height speed
 	float heightSpeed;
+};
+
+
+// struct containing a single parameter, either float or string
+// use isFloat to determine which value to access from data
+// TODO: convert to union or type casts?
+struct Parameter {
+	bool isFloat;
+	
+	// data
+	std::string str;
+	float fl;
+	
+	uint32_t index;
+};
+
+// struct containing string/number parameters as well as sub-parameters
+struct Parameters {
+	std::vector<Parameter> parameters;
+	
+	std::vector<Parameters*> subparameters;
 };
 
 struct Block {
@@ -182,6 +205,10 @@ void playAudio(Scene* scene, TriggerInfo* triggerInfo);
 
 TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* eventStrings, std::vector<float>* eventNumbers, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action);
 
+// parameter management
+Parameter createParameter(float fl, uint32_t index);
+Parameter createParameter(std::string str, uint32_t index);
+
 // other stuff
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, TextureData* texture);
 TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, glm::vec3 color);
@@ -196,10 +223,13 @@ BoundingBox* createBbox(BoundingBox* original);
 
 bool bboxContains(BoundingBox* box, glm::vec2 point);
 bool cubesIntersecting(glm::vec3 p1, glm::vec3 s1, glm::vec3 p2, glm::vec3 s2);
+bool linesIntersecting(glm::vec2 a1, glm::vec2 a2, glm::vec2 b1, glm::vec2 b2);
+bool lineIntersectingBbox(glm::vec2 p1, glm::vec2 p2, BoundingBox* bbox);
+
 
 Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap);
 glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed, double delta);
-BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double distance, double delta, uint32_t* iterations);
+BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double delta, uint32_t* iterations);
 void updatePlayerPosition(Player* player, Scene* scene, Window* window, double delta);
 
 Scene* createScene(Window* window, Player* player);

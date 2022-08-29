@@ -35,8 +35,8 @@ int main(int argc, char** argv){
 	uint32_t screenHeight = 720;
 	//uint32_t screenHeight = 600;
 	
-	float xSensitivity = 1;
-	float ySensitivity = 1;
+	float xSensitivity = 0.5f;
+	float ySensitivity = 0.5f;
 	
 	Window* window = createWindow(screenWidth, screenHeight, "Virtual Museum Remastered");
 	

@@ -85,6 +85,8 @@ struct RenderableObject {
 	glm::vec3 rotation;
 	glm::vec3 scale;
 	
+	std::vector<glm::vec3> corners;
+	
 	glm::mat4 modelMatrix;
 };
 

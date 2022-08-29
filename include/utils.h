@@ -15,6 +15,12 @@ T* allocateMemoryForType(){
 	return (T*)malloc( sizeof(T) );
 }
 
+// square a type
+template <typename T>
+T square(T x){
+	return x*x;
+}
+
 // read the contents of a file and return a char buffer of the contents (free the buffer when done!)
 char* read_entire_file(const char* file);
 

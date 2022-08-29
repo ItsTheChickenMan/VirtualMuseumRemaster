@@ -250,7 +250,34 @@ void playAudio(Scene* scene, TriggerInfo* triggerInfo){
 	playSound(sound);
 }
 
-// others stuff //
+// parameter management
+
+// constructors
+Parameter createParameter(float fl, uint32_t index){
+	Parameter p;
+	
+	p.isFloat = true;
+	
+	p.fl = fl;
+	
+	p.index = index;
+	
+	return p;
+}
+
+Parameter createParameter(std::string str, uint32_t index){
+	Parameter p;
+	
+	p.isFloat = false;
+	
+	p.str = str;
+	
+	p.index = index;
+	
+	return p;
+}
+
+// other stuff //
 
 // textured object constructors
 
@@ -373,6 +400,45 @@ bool cubesIntersecting(glm::vec3 p1, glm::vec3 s1, glm::vec3 p2, glm::vec3 s2){
 	);
 }
 
+// check if a line intersects another line
+// adapted from: https://stackoverflow.com/a/3746601
+// I have no idea how this works, but it does
+bool linesIntersecting(glm::vec2 a1, glm::vec2 a2, glm::vec2 b1, glm::vec2 b2){
+	glm::vec2 b = a2 - a1;
+	glm::vec2 d = b2 - b1;
+	float bDotDPerp = b.x * d.y - b.y * d.x;
+
+	// if b dot d == 0, it means the lines are parallel so have infinite intersection points
+	if (bDotDPerp == 0)
+		return false;
+
+	glm::vec2 c = b1 - a1;
+	float t = (c.x * d.y - c.y * d.x) / bDotDPerp;
+	if (t < 0 || t > 1)
+		return false;
+
+	float u = (c.x * b.y - c.y * b.x) / bDotDPerp;
+	if (u < 0 || u > 1)
+		return false;
+	
+	return true;
+}
+
+// check if a line intersects a bbox
+// FIXME: could be more efficient since a lot of recalculation seems to happen in linesIntersecting
+bool lineIntersectingBbox(glm::vec2 p1, glm::vec2 p2, BoundingBox* bbox){
+	// if bbox contains both points of line, return true
+	// this is technically not how this function should behave, but it works fine here
+	if( bboxContains(bbox, p1) && bboxContains(bbox, p2) ) return true;
+	
+	if( linesIntersecting(bbox->UL, bbox->UR, p1, p2) ) return true;
+	if( linesIntersecting(bbox->BL, bbox->BR, p1, p2) ) return true;
+	if( linesIntersecting(bbox->UL, bbox->BL, p1, p2) ) return true;
+	if( linesIntersecting(bbox->UR, bbox->BR, p1, p2) ) return true;
+	
+	return false;
+}
+
 // construct player
 Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap){
 	Player* player = allocateMemoryForType<Player>();
@@ -410,7 +476,7 @@ glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed
 }
 
 // returns the bounding box the player is within, or null if the player isn't within any bboxes or adjacent bboxes
-BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double distance, double delta, uint32_t* iterations){
+BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double delta, uint32_t* iterations){
 	if(bbox == NULL) return NULL;
 	
 	if(iterations != NULL) (*iterations)++;
@@ -419,30 +485,24 @@ BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 posit
 	checked->push_back(bbox);
 
 	// if player is in bbox, all good
-	if(bboxContains(bbox, glm::vec2(position.x, position.z))){
-		return bbox;
-	} else {
-		// if the distance exceeds the maximum expected distance the player could travel, stop checking boxes and return NULL
-		double maxDistance = scene->maxPlayerSpeed*delta;
-		
-		if(distance > maxDistance) return NULL;
-		
-		for(uint32_t i = 0; i < bbox->adjacent->size(); i++){
-			BoundingBox* adjacent = scene->walkmap->at(bbox->adjacent->at(i));
+	if(lineIntersectingBbox( glm::vec2(oldPosition.x, oldPosition.z), glm::vec2(position.x, position.z), bbox)){
+		if(bboxContains(bbox, glm::vec2(position.x, position.z))){
+			return bbox;
+		} else {
+			for(uint32_t i = 0; i < bbox->adjacent->size(); i++){
+				BoundingBox* adjacent = scene->walkmap->at(bbox->adjacent->at(i));
+				
+				// make sure box hasn't been checked yet
+				if(std::find(checked->begin(), checked->end(), adjacent) != checked->end()) continue;
 			
-			// make sure box hasn't been checked yet
-			if(std::find(checked->begin(), checked->end(), adjacent) != checked->end()) continue;
-			
-			float newDistance = distance + (double)glm::length( glm::vec2(oldPosition.x, oldPosition.z) - glm::vec2(adjacent->position.x, adjacent->position.z) );
-			//newDistance = 0;
-			
-			// check other
-			BoundingBox* other = checkBbox(adjacent, oldPosition, position, scene, checked, newDistance, delta, iterations);
-			
-			// if other was found in adjacent boxes, return it
-			if(other != NULL) return other;
-			
-			// otherwise keep looking
+				// check other
+				BoundingBox* other = checkBbox(adjacent, oldPosition, position, scene, checked, delta, iterations);
+				
+				// if other was found in adjacent boxes, return it
+				if(other != NULL) return other;
+				
+				// otherwise keep looking
+			}
 		}
 	}
 	
@@ -457,15 +517,13 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 	
 	glm::vec3 position = player->camera->position + movementVector;
 
+	uint32_t iterations = 0;
+
 	// check if player is within walkmap, if one exists
 	if(scene->walkmap->size() > 0){
 		std::vector<BoundingBox*> checked; // vector of bboxes already checked
 		
-		uint32_t iterations = 0;
-		
-		BoundingBox* playerBbox = checkBbox(player->currentBbox, player->camera->position, position, scene, &checked, 0, delta, &iterations);
-		
-		//printf("iterations: %d\n", iterations);
+		BoundingBox* playerBbox = checkBbox(player->currentBbox, player->camera->position, position, scene, &checked, delta, &iterations);
 		
 		// if playerBbox was found, update player bbox and call it a day
 		if(playerBbox != NULL && player->currentBbox != NULL){
@@ -497,7 +555,7 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 			// this is inefficient and it hurts to do
 			checked.clear();
 			
-			playerBbox = checkBbox(player->currentBbox, player->camera->position, position, scene, &checked, 0, delta, NULL);
+			playerBbox = checkBbox(player->currentBbox, player->camera->position, position, scene, &checked, delta, &iterations);
 			
 			if(!playerBbox){
 				position = player->camera->position;
@@ -512,13 +570,15 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 		// we make the camera 7/8 of player height to leave a bit of headroom and not look through objects above
 		float currentHeight = player->camera->position.y;
 		float desiredHeight = player->currentBbox->position.y + scene->playerHeight*0.875;
-		float newHeight = currentHeight + (desiredHeight - currentHeight)*scene->heightSpeed;
+		float newHeight = currentHeight + (desiredHeight - currentHeight)* std::min(scene->heightSpeed * (float)delta, 1.0f);
 		
 		player->camera->position = glm::vec3(position.x, newHeight, position.z);
 	} else {
 		// no walkmap
 		player->camera->position = position;
 	}
+	
+	printf("iterations: %d\n", iterations);
 }
 
 // world
@@ -1075,7 +1135,7 @@ Scene* createScene(Window* window, Player* player){
 	scene->playerRadius = 0.5f;
 	scene->stepHeight = 0.4f;
 	scene->maxPlayerSpeed = 2.f;
-	scene->heightSpeed = 0.1f;
+	scene->heightSpeed = 10.f;
 	
 	return scene;
 }

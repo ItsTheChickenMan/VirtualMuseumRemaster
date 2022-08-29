@@ -105,7 +105,7 @@
 # audio blocks
 
 .[./res/sounds/test1.ogg, test1]
-
+.[./res/sounds/test2.ogg, test2]
 
 # vertex data initialization blocks
 
@@ -164,8 +164,8 @@ $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 ![0,0,0,0,0,0, onStart, playBackgroundMusic (./res/sounds/stal.ogg, 2, true)]
 
 # change height every time the player goes near the cesium man
-![3, 1.5, 1, 1, 2, 1, onEnterRepeating, changeSetting (0, 4.25)]
-![3, 1.5, 1, 1, 2, 1, onExit, changeSetting (0, 2)]
+![3, 2.5, 1, 1, 4, 1, onEnterRepeating, changeSetting (0, 4.4)]
+![3, 2.5, 1, 1, 4, 1, onExit, changeSetting (0, 2)]
 
 # blast music every time the player goes near the smiley face
 # I don't recommend using this to create false spatial audio, since real spatial audio is supported.
@@ -175,5 +175,10 @@ $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 # play a sound when the player touches the avocado
 ![0, 1.63, 4, 1.2, 1.2, 1.2, onEnter, playAudio (test1, 100, false, true)]
 
+# change player height with T key
 ![0,0,0,0,0,0, onKeyHold (84), changeSetting (0, 6)]
 ![0,0,0,0,0,0, onKeyRelease (84), changeSetting (0, 2)]
+
+# play some example audio when the player is in this box and presses E
+$[-3, 2, -3,    0, 0, 0,    1.5, 1.5, 1.5,    default,    cube,    nowalk]
+![-3, 2, -3, 1.5, 1.5, 1.5, onKeyPress (69), playAudio (test2, 100, false, true)]
