@@ -578,7 +578,7 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 		player->camera->position = position;
 	}
 	
-	printf("iterations: %d\n", iterations);
+	//printf("iterations: %d\n", iterations);
 }
 
 // world

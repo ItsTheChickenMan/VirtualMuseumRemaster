@@ -245,7 +245,7 @@ void addProgramExPointLight(ShaderProgramEx* programEx, const char* location, Po
 	}
 	
 	// get location name + index
-	std::string locationName(location);
+	std::string locationName = std::string(location);
 	locationName += '[';
 	locationName += std::to_string(programEx->numPointLights);
 	locationName += ']';
@@ -258,14 +258,14 @@ void addProgramExPointLight(ShaderProgramEx* programEx, const char* location, Po
 	glUniform3fv(getProgramExUniformLocation(programEx, locationBuffer), 1, glm::value_ptr(light->position));
 	
 	// color
-	locationBuffer = (locationName + ".color");
+	locationBuffer = locationName + ".color";	
 	glUniform3fv(getProgramExUniformLocation(programEx, locationBuffer), 1, glm::value_ptr(light->color));
 	
 	// strengths
-	locationBuffer = locationName + ".ambientStrength";
+	locationBuffer = locationName + ".ambientStrength";	
 	glUniform1f(getProgramExUniformLocation(programEx, locationBuffer), light->ambientStrength);
 	
-	locationBuffer = locationName + ".diffuseStrength";
+	locationBuffer = locationName + ".diffuseStrength";	
 	glUniform1f(getProgramExUniformLocation(programEx, locationBuffer), light->diffuseStrength);
 	
 	// attenuation values

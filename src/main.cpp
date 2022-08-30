@@ -29,11 +29,12 @@ int main(int argc, char** argv){
 	// create render window
 	printf("Creating window...");
 	
-	uint32_t screenWidth = 1280;
-	//uint32_t screenWidth = 800;
+	// TODO: args parser
+	//uint32_t screenWidth = 1280;
+	uint32_t screenWidth = 800;
 	
-	uint32_t screenHeight = 720;
-	//uint32_t screenHeight = 600;
+	//uint32_t screenHeight = 720;
+	uint32_t screenHeight = 600;
 	
 	float xSensitivity = 0.5f;
 	float ySensitivity = 0.5f;
@@ -105,6 +106,10 @@ int main(int argc, char** argv){
 	for(uint32_t i = 1; i < argc; i++){
 		parseWorldIntoScene(scene, argv[i]);
 	}
+	
+	/*for(uint32_t i = 0; i < scene->pointLights->size(); i++){
+		printf("%f, %f, %f\n", scene->pointLights->at(i)->color.x, scene->pointLights->at(i)->color.y, scene->pointLights->at(i)->color.z);
+	}*/
 	
 	printf("Done\nRender Loop Starting\n");
 	

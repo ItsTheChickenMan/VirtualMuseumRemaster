@@ -40,9 +40,15 @@ uniform sampler2D texture1;
 // color (defined if no texture is defined)
 uniform vec3 color;
 
+// on some implementations opengl doesn't consider the pointLights active uniforms, so we "wake them up" by accessing their properties once
+// this is very annoying, I'd love to find a fix but it doesn't seem like anyone else has encountered this problem (at least on SO)
+void wakeUpPointLights();
+
 vec3 calculatePointLightContribution(PointLight light);
 
 void main(){
+	wakeUpPointLights();
+
 	// get texture sample
 	vec3 baseColor = vec3(texture(texture1, TexCoords)) + color;
 	
@@ -59,6 +65,16 @@ void main(){
 	}
 	
 	FragColor = vec4(final, 1);
+}
+
+void wakeUpPointLights(){
+	pointLights[0].position;
+	pointLights[0].color;
+	pointLights[0].ambientStrength;
+	pointLights[0].diffuseStrength;
+	pointLights[0].c;
+	pointLights[0].l;
+	pointLights[0].q;
 }
 
 // expects normalized values when necessary
