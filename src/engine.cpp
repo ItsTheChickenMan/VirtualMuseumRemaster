@@ -98,7 +98,8 @@ void renderScene(Scene* scene, PerspectiveCamera* camera, ShaderProgramEx* progr
 			
 			float angle = glm::dot(camera->forward, glm::normalize(furthestPossiblePoint - camera->position) );
 			
-			if(angle < 0) continue;
+			// add a distance check because it's inconsistent with models at close range
+			if(angle < 0 && distance2 > 64) continue;
 			
 			// set model matrix (necessary for lighting)
 			glUniformMatrix4fv(getProgramExUniformLocation(programEx, "model"), 1, GL_FALSE, glm::value_ptr(object->renderableObject->modelMatrix));

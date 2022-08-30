@@ -105,6 +105,9 @@ struct Scene {
 	// player
 	Player* player;
 	
+	// game directory
+	std::string* gameDir;
+	
 	// loaded vertex data
 	std::map<std::string, VertexData*>* vertexData;
 	
@@ -232,9 +235,9 @@ glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed
 BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double delta, uint32_t* iterations);
 void updatePlayerPosition(Player* player, Scene* scene, Window* window, double delta);
 
-Scene* createScene(Window* window, Player* player);
+Scene* createScene(Window* window, Player* player, std::string gameDir);
 void parseWorldIntoScene(Scene* scene, const char* file);
-Scene* parseWorld(const char* file, Window* window, Player* player);
+Scene* parseWorld(const char* file, Window* window, Player* player, std::string gameDir);
 bool hasWalkmap(Scene* scene);
 void checkTriggers(Scene* scene);
 

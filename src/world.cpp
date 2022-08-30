@@ -12,6 +12,26 @@
 
 #include <glm/gtx/norm.hpp>
 
+// parser settings
+const char commentDelimiter = '#';
+const char parameterDelimiter = ',';
+const char blockOpen = '[';
+const char blockClose = ']';
+const char textureBlockDelimiter = '%';
+const char vertexDataBlockDelimiter = '*';
+const char audioBlockDelimiter = '.';
+const char objectBlockDelimiter = '$';
+const char lightBlockDelimiter = '&';
+const char modelBlockDelimiter = '+';
+const char walkBoxBlockDelimiter = '~';
+const char settingsBlockDelimiter = '@';
+const char triggerBlockDelimiter = '!';
+
+const std::string modelsPath = "./models/";
+const std::string soundsPath = "./sounds/";
+const std::string texturesPath = "./textures/";
+const std::string worldsPath = "./worlds/";
+
 // event types and action types are hard coded into the parser right here
 
 // this map is for event names -> their event checker functions (the functions which check if a TriggerInfo struct should be fired)
@@ -193,7 +213,7 @@ void playBackgroundMusicAction(Scene* scene, TriggerInfo* triggerInfo){
 	}
 	
 	// load vals
-	std::string& path = triggerInfo->strings->at(0);
+	std::string path = *scene->gameDir + soundsPath + triggerInfo->strings->at(0);
 	bool loop = triggerInfo->strings->at(1) == "true";
 	float volume = triggerInfo->numbers->at(0);
 	
@@ -583,21 +603,6 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 
 // world
 
-// parser settings
-const char commentDelimiter = '#';
-const char parameterDelimiter = ',';
-const char blockOpen = '[';
-const char blockClose = ']';
-const char textureBlockDelimiter = '%';
-const char vertexDataBlockDelimiter = '*';
-const char audioBlockDelimiter = '.';
-const char objectBlockDelimiter = '$';
-const char lightBlockDelimiter = '&';
-const char modelBlockDelimiter = '+';
-const char walkBoxBlockDelimiter = '~';
-const char settingsBlockDelimiter = '@';
-const char triggerBlockDelimiter = '!';
-
 // create a block
 Block* createBlock(){
 	Block* block = allocateMemoryForType<Block>();
@@ -714,12 +719,20 @@ Block* parseStringToBlock(std::string blockString){
 	return block;
 }
 
-
 // block to scene methods
 void textureBlockToScene(Block* block, Scene* scene){
+	// validate size
+	uint32_t numStrings = 2;
+	if(block->strings->size() < numStrings){
+		printf("Not enough parameters for texture block (only %d strings present when %d were expected)\n", block->strings->size(), numStrings);
+		return;
+	}
+	
 	// load values
 	std::string texturePath = block->strings->at(0);
 	std::string textureName = block->strings->at(1);
+	
+	texturePath = (*scene->gameDir) + texturesPath + texturePath;
 	
 	// exclude required special textures
 	if(textureName == "invisible") return;
@@ -729,6 +742,13 @@ void textureBlockToScene(Block* block, Scene* scene){
 }
 
 void vertexDataBlockToScene(Block* block, Scene* scene){
+	// validate size
+	uint32_t numStrings = 2;
+	if(block->strings->size() < numStrings){
+		printf("Not enough parameters for vertex data block (only %d strings present when %d were expected)\n", block->strings->size(), numStrings);
+		return;
+	}
+	
 	// load values
 	std::string shapeName = block->strings->at(0);
 	std::string vertexDataName = block->strings->at(1);
@@ -924,12 +944,21 @@ void lightBlockToScene(Block* block, Scene* scene){
 }
 
 void modelBlockToScene(Block* block, Scene* scene){
+	// validate size
+	uint32_t numStrings = 2;
+	if(block->strings->size() < numStrings){
+		printf("Not enough parameters for model block (only %d strings present when %d were expected)\n", block->strings->size(), numStrings);
+		return;
+	}
+	
 	// load values
-	std::string path = block->strings->at(0);
+	std::string modelPath = block->strings->at(0);
 	std::string modelName = block->strings->at(1);
 	
+	modelPath = (*scene->gameDir) + modelsPath + modelPath;
+	
 	// load model
-	Model* model = loadModel(path);
+	Model* model = loadModel(modelPath);
 	
 	if(!model){
 		return; // fail
@@ -1084,10 +1113,12 @@ void audioBlockToScene(Block* block, Scene* scene){
 	}
 	
 	// load audio
-	std::string path = block->strings->at(0);
-	std::string name = block->strings->at(1);
+	std::string audioPath = block->strings->at(0);
+	std::string audioName = block->strings->at(1);
 	
-	loadSoundFile(path, name);
+	audioPath = (*scene->gameDir) + soundsPath + audioPath;
+	
+	loadSoundFile(audioPath, audioName);
 }
 
 // copies the elements from numbers and strings
@@ -1113,13 +1144,14 @@ TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<
 
 // create the shell of a scene
 // also initializes player currentBbox
-Scene* createScene(Window* window, Player* player){
+Scene* createScene(Window* window, Player* player, std::string gameDir){
 	// allocate memory
 	Scene* scene = allocateMemoryForType<Scene>();
 	
 	// initialize values
 	scene->window = window;
 	scene->player = player;
+	scene->gameDir = new std::string(gameDir);
 	scene->vertexData = new std::map<std::string, VertexData*>();
 	scene->textures = new std::map<std::string, TextureData*>();
 	scene->models = new std::map<std::string, Model*>();
@@ -1256,8 +1288,8 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 }
 
 // parse world
-Scene* parseWorld(const char* file, Window* window, Player* player){
-	Scene* scene = createScene(window, player);
+Scene* parseWorld(const char* file, Window* window, Player* player, std::string gameDir){
+	Scene* scene = createScene(window, player, gameDir);
 	
 	parseWorldIntoScene(scene, file);
 	
