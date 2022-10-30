@@ -1,0 +1,1340 @@
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400    1) // world parser
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400    2) #include <world.h>
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400    3) #include <utils.h>
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400    4) #include <shapes.h>
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400    5) #include <audio.h>
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400    6) 
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400    7) #include <cctype>
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400    8) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400    9) #include <stdexcept>
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   10) #include <ctgmath>
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   11) #include <algorithm>
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   12) 
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   13) #include <glm/gtx/norm.hpp>
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400   14) 
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   15) // parser settings
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   16) const char commentDelimiter = '#';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   17) const char parameterDelimiter = ',';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   18) const char blockOpen = '[';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   19) const char blockClose = ']';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   20) const char textureBlockDelimiter = '%';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   21) const char vertexDataBlockDelimiter = '*';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   22) const char audioBlockDelimiter = '.';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   23) const char objectBlockDelimiter = '$';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   24) const char lightBlockDelimiter = '&';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   25) const char modelBlockDelimiter = '+';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   26) const char walkBoxBlockDelimiter = '~';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   27) const char settingsBlockDelimiter = '@';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   28) const char triggerBlockDelimiter = '!';
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   29) 
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   30) const std::string modelsPath = "./models/";
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   31) const std::string soundsPath = "./sounds/";
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   32) const std::string texturesPath = "./textures/";
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   33) const std::string worldsPath = "./worlds/";
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400   34) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   35) // event types and action types are hard coded into the parser right here
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   36) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   37) // this map is for event names -> their event checker functions (the functions which check if a TriggerInfo struct should be fired)
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   38) // this should not be modified at all during runtime
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   39) const std::map<std::string, EventCheckFunction> g_eventCheckers = {
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   40) 	{"onStart", onStartChecker},
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   41) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   42) 	{"onEnter", onEnterChecker},
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   43) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   44) 	{"onEnterRepeat", onEnterRepeatChecker},
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   45) 	{"onEnterRepeating", onEnterRepeatChecker},
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   46) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400   47) 	{"onExit", onExitChecker},
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400   48) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400   49) 	{"onKeyPress", onKeyPressChecker},
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400   50) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400   51) 	{"onKeyHold", onKeyHoldChecker},
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400   52) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400   53) 	{"onKeyRelease", onKeyReleaseChecker}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   54) };
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   55) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   56) // this map is for storing action methods for each action name
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   57) const std::map<std::string, TriggerActionFunction> g_triggerActions = {
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   58) 	{"logToConsole", logToConsole},
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400   59) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   60) 	{"changeSetting", changeSetting},
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400   61) 
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   62) 	{"playBackgroundMusic", playBackgroundMusicAction},
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400   63) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400   64) 	{"setBackgroundMusicSettings", setBackgroundMusicSettings},
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400   65) 
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400   66) 	{"playAudio", playAudio}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   67) };
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   68) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   69) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   70) // trigger management //
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   71) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   72) // checker functions
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   73) // syntax = eventNameChecker
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   74) // note that in all checkers, 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   75) 
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   76) bool onStartChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   77) 	return scene->frame == 0;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   78) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   79) 
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   80) bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   81) 	// if this is the first frame, add some extra trigger related info to triggerInfo
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400   82) 	// this shouldn't cause any issues because triggers can only be created when the scene is first loaded, so all valid triggers should be checked on the first checkTriggers call
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   83) 	if(scene->frame == 0){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   84) 		// this value is equal to the last frame in which the player was intersecting the bounding box.  the trigger will never fire between two consecutive frames
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400   85) 		triggerInfo->reserved->push_back(0);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   86) 	}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   87) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400   88) 	int32_t lastFrame = *triggerInfo->reserved->begin();
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400   89) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   90) 	if(inBoundingCube){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   91) 		// update last frame
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400   92) 		*triggerInfo->reserved->begin() = (int32_t)scene->frame;
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   93) 		
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   94) 		// if this frame and the last intersection frame are consecutive, return false, otherwise return true
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   95) 		return scene->frame - lastFrame > 1;
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400   96) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   97) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   98) 	return false;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400   99) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  100) 
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  101) bool onEnterRepeatChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  102) 	return inBoundingCube;
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  103) }
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  104) 
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  105) bool onExitChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  106) 	// works similar to onEnterChecker, but the opposite
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  107) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  108) 	// if this is the first frame, add some extra trigger related info to triggerInfo
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  109) 	if(scene->frame == 0){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  110) 		// this value is equal to the last frame in which the player was intersecting the bounding box.  the trigger will never fire between two consecutive frames
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  111) 		triggerInfo->reserved->push_back(0);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  112) 	}
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  113) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  114) 	int32_t lastFrame = *triggerInfo->reserved->begin();
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  115) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  116) 	if(!inBoundingCube){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  117) 		// update last frame
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  118) 		*triggerInfo->reserved->begin() = (int32_t)scene->frame;
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  119) 		
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  120) 		// if this frame and the last intersection frame are consecutive, return false, otherwise return true
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  121) 		return scene->frame - lastFrame > 1;
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  122) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  123) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  124) 	return false;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  125) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  126) 
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  127) bool onKeyPressChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  128) 	// initialization
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  129) 	if(scene->frame == 0){
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  130) 		triggerInfo->reserved->push_back(0);
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  131) 	}
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  132) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  133) 	int32_t lastFrame = *triggerInfo->reserved->begin();
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  134) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  135) 	if(onKeyHoldChecker(scene, triggerInfo, inBoundingCube)){
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  136) 		// update last frame
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  137) 		*triggerInfo->reserved->begin() = (int32_t)scene->frame;
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  138) 		
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  139) 		// if this frame and the last press frame are consecutive, return false, otherwise return true
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  140) 		return scene->frame - lastFrame > 1;
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  141) 	}
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  142) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  143) 	return false;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  144) }
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  145) 
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  146) bool onKeyHoldChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  147) 	// size check
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  148) 	if(triggerInfo->eventNumbers->size() < 1) return false;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  149) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  150) 	return glfwGetKey(scene->window->glfwWindow, (int32_t)triggerInfo->eventNumbers->at(0)) && inBoundingCube;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  151) }
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  152) 
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  153) bool onKeyReleaseChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  154) 	// initialization
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  155) 	if(scene->frame == 0){
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  156) 		triggerInfo->reserved->push_back(0);
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  157) 	}
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  158) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  159) 	int32_t lastFrame = *triggerInfo->reserved->begin();
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  160) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  161) 	if(!onKeyHoldChecker(scene, triggerInfo, inBoundingCube)){
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  162) 		// update last frame
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  163) 		*triggerInfo->reserved->begin() = (int32_t)scene->frame;
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  164) 		
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  165) 		// if this frame and the last press frame are consecutive, return false, otherwise return true
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  166) 		return scene->frame - lastFrame > 1;
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  167) 	}
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  168) 	
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400  169) 	return false;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  170) }
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  171) 
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  172) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  173) // action functions
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  174) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  175) void logToConsole(Scene* scene, TriggerInfo* triggerInfo){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  176) 	for(uint32_t i = 0; i < triggerInfo->strings->size(); i++){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  177) 		if(i == 0){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  178) 			printf("%s", triggerInfo->strings->at(i).c_str());
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  179) 		} else {
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  180) 			printf(", %s", triggerInfo->strings->at(i).c_str());
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  181) 		}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  182) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  183) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  184) 	for(uint32_t i = 0; i < triggerInfo->numbers->size(); i++){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  185) 		if(i == 0 && triggerInfo->strings->size() == 0){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  186) 			printf("%f", triggerInfo->numbers->at(i));
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  187) 		} else {
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  188) 			printf(", %f", triggerInfo->numbers->at(i));
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  189) 		}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  190) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  191) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  192) 	printf("\n");
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  193) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  194) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  195) void changeSetting(Scene* scene, TriggerInfo* triggerInfo){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  196) 	// validate size
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  197) 	if(triggerInfo->numbers->size() < 2){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  198) 		return;
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  199) 	}
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  200) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  201) 	// get setting index as int
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  202) 	int32_t index = (int32_t)triggerInfo->numbers->at(0);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  203) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  204) 	// new setting
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  205) 	float setting = triggerInfo->numbers->at(1);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  206) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  207) 	// modify setting
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  208) 	(&scene->playerHeight)[index] = setting;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  209) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  210) 
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  211) // we call this playBackgroundMusicAction because playBackgroundMusic already exists in audio.h
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  212) void playBackgroundMusicAction(Scene* scene, TriggerInfo* triggerInfo){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  213) 	// validate size
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  214) 	// FIXME: it's not super efficient to validate every time this is fired when the string and numbers size never changes.  maybe do a separate validationCheck function per action that gets run every time a trigger block is created?  would avoid some other bugs caused by TriggerInfo holding initialization values as well (which could cause this to fail)
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  215) 	if(triggerInfo->strings->size() < 2 || triggerInfo->numbers->size() < 1){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  216) 		return;
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  217) 	}
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  218) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  219) 	// load vals
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  220) 	std::string path = *scene->gameDir + soundsPath + triggerInfo->strings->at(0);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  221) 	bool loop = triggerInfo->strings->at(1) == "true";
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  222) 	float volume = triggerInfo->numbers->at(0);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  223) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  224) 	playBackgroundMusic(path, volume, loop);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  225) }
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  226) 
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  227) void setBackgroundMusicSettings(Scene* scene, TriggerInfo* triggerInfo){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  228) 	// validate size
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  229) 	if(triggerInfo->strings->size() < 1 || triggerInfo->numbers->size() < 1){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  230) 		return;
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  231) 	}
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  232) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  233) 	// load vals
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  234) 	bool loop = triggerInfo->strings->at(0) == "true";
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  235) 	float volume = triggerInfo->numbers->at(0);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  236) 	
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  237) 	setBackgroundMusicLoop(loop);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  238) 	setBackgroundMusicVolume(volume);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  239) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  240) 
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  241) void playAudio(Scene* scene, TriggerInfo* triggerInfo){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  242) 	// validate size
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  243) 	if(triggerInfo->strings->size() < 3 || triggerInfo->numbers->size() < 1){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  244) 		return;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  245) 	}
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  246) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  247) 	// load vals
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  248) 	std::string key = triggerInfo->strings->at(0);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  249) 	float volume = triggerInfo->numbers->at(0);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  250) 	bool loop = triggerInfo->strings->at(1) == "true";
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  251) 	bool spatial = triggerInfo->strings->at(2) == "true";
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  252) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  253) 	// create a new sound
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  254) 	sf::Sound* sound = createSound(key);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  255) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  256) 	if(sound == NULL) return;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  257) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  258) 	// update settings
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  259) 	sound->setVolume(volume);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  260) 	sound->setLoop(loop);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  261) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  262) 	if(spatial){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  263) 		// load vals
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  264) 		float attenuation = triggerInfo->numbers->size() > 1 ? triggerInfo->numbers->at(1) : 0.5f;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  265) 		float minDistance = triggerInfo->numbers->size() > 2 ? triggerInfo->numbers->at(2) : 1.f;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  266) 		
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  267) 		sound->setPosition( glmVecToSFML(triggerInfo->position) );
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  268) 		sound->setAttenuation(attenuation);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  269) 		sound->setMinDistance(minDistance);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  270) 	} else {
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  271) 		sound->setRelativeToListener(true);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  272) 	}
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  273) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  274) 	playSound(sound);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  275) }
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  276) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  277) // parameter management
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  278) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  279) // constructors
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  280) Parameter createParameter(float fl, uint32_t index){
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  281) 	Parameter p;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  282) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  283) 	p.isFloat = true;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  284) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  285) 	p.fl = fl;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  286) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  287) 	p.index = index;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  288) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  289) 	return p;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  290) }
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  291) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  292) Parameter createParameter(std::string str, uint32_t index){
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  293) 	Parameter p;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  294) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  295) 	p.isFloat = false;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  296) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  297) 	p.str = str;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  298) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  299) 	p.index = index;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  300) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  301) 	return p;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  302) }
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  303) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  304) // other stuff //
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  305) 
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  306) // textured object constructors
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  307) 
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  308) // creates a textured renderable object from an existing object and an existing texture data
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  309) TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, TextureData* texture){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  310) 	TexturedRenderableObject* texturedObject = allocateMemoryForType<TexturedRenderableObject>();
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  311) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  312) 	texturedObject->renderableObject = object;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  313) 	texturedObject->textureData = texture;
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  314) 	texturedObject->color = glm::vec3(0);
+0b0b0073 (Phoenix Dalla Costa 2022-08-23 10:47:02 -0400  315) 	texturedObject->visible = true;
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  316) 	
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  317) 	return texturedObject;
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  318) }
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  319) 
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  320) // creates a textured renderable object from an existing object and vec3 color
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  321) TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, glm::vec3 color){
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  322) 	TexturedRenderableObject* texturedObject = allocateMemoryForType<TexturedRenderableObject>();
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  323) 	
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  324) 	texturedObject->renderableObject = object;
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  325) 	texturedObject->textureData = NULL;
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  326) 	texturedObject->color = color;
+0b0b0073 (Phoenix Dalla Costa 2022-08-23 10:47:02 -0400  327) 	texturedObject->visible = true;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  328) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  329) 	return texturedObject;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  330) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  331) 
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  332) // from new renderable object params and existing texture data
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  333) TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, TextureData* texture){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  334) 	RenderableObject* object = createRenderableObject(vertexData, position, rotation, scale);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  335) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  336) 	return createTexturedRenderableObject(object, texture);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  337) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  338) 
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  339) // from new renderable object params and color
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  340) TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, glm::vec3 color){
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  341) 	RenderableObject* object = createRenderableObject(vertexData, position, rotation, scale);
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  342) 	
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  343) 	return createTexturedRenderableObject(object, color);
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  344) }
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  345) 
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  346) // from existing renderable object and new texture data params
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  347) TexturedRenderableObject* createTexturedRenderableObject(RenderableObject* object, const char* texturePath){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  348) 	TextureData* texture = createTextureData(texturePath);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  349) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  350) 	return createTexturedRenderableObject(object, texture);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  351) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  352) 
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  353) // completely new
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  354) TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, const char* texturePath){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  355) 	RenderableObject* object = createRenderableObject(vertexData, position, rotation, scale);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  356) 	TextureData* texture = createTextureData(texturePath);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  357) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  358) 	return createTexturedRenderableObject(object, texture);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  359) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  360) 
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  361) // destroys renderable object
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  362) // leaves texture data
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  363) void destroyTexturedRenderableObject(TexturedRenderableObject* texturedObject){
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  364) 	
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  365) }
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  366) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  367) // bounding box constructors
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  368) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  369) // create bounding box with 2d position
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  370) BoundingBox* createBbox(glm::vec2 p, glm::vec2 s){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  371) 	return createBbox(glm::vec3(p.x, 0, p.y), s);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  372) }
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  373) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  374) // create bounding box with 3d position
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  375) BoundingBox* createBbox(glm::vec3 p, glm::vec2 s){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  376) 	// create 2d corners
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  377) 	glm::vec2 UL = glm::vec2( (p.x-s.x/2.f), (p.z-s.y/2.f) );
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  378) 	glm::vec2 UR = glm::vec2( (p.x+s.x/2.f), (p.z-s.y/2.f) );
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  379) 	glm::vec2 BL = glm::vec2( (p.x-s.x/2.f), (p.z+s.y/2.f) );
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  380) 	glm::vec2 BR = glm::vec2( (p.x+s.x/2.f), (p.z+s.y/2.f) );
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  381) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  382) 	// allocate space for box
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  383) 	BoundingBox* box = allocateMemoryForType<BoundingBox>();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  384) 	box->position = p;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  385) 	box->size = s;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  386) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  387) 	box->UL = UL;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  388) 	box->UR = UR;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  389) 	box->BL = BL;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  390) 	box->BR = BR;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  391) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  392) 	box->adjacent = new std::vector<uint32_t>();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  393) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  394) 	return box;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  395) }
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  396) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  397) // copy bbox (but doesn't copy adjacent)
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  398) BoundingBox* createBbox(BoundingBox* original){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  399) 	return createBbox(original->position, original->size);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  400) }
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  401) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  402) // destroy a bbox
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  403) void destroyBbox(BoundingBox* b){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  404) 	delete b->adjacent;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  405) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  406) 	free(b);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  407) }
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  408) 
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  409) // check if bbox contains point
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  410) bool bboxContains(BoundingBox* bbox, glm::vec2 point){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  411) 	return (
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  412) 		point.x >= bbox->position.x-bbox->size.x/2.f &&
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  413) 		point.x <= bbox->position.x+bbox->size.x/2.f &&
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  414) 		point.y >= bbox->position.z-bbox->size.y/2.f &&
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  415) 		point.y <= bbox->position.z+bbox->size.y/2.f
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  416) 	);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  417) }
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  418) 
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  419) // check if a line intersects a bbox
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  420) // FIXME: could be more efficient since a lot of recalculation seems to happen in linesIntersecting
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  421) bool lineIntersectingBbox(glm::vec2 p1, glm::vec2 p2, BoundingBox* bbox){
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  422) 	// if bbox contains both points of line, return true
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  423) 	// this is technically not how this function should behave, but it works fine here
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  424) 	if( bboxContains(bbox, p1) && bboxContains(bbox, p2) ) return true;
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  425) 	
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  426) 	if( linesIntersecting(bbox->UL, bbox->UR, p1, p2) ) return true;
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  427) 	if( linesIntersecting(bbox->BL, bbox->BR, p1, p2) ) return true;
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  428) 	if( linesIntersecting(bbox->UL, bbox->BL, p1, p2) ) return true;
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  429) 	if( linesIntersecting(bbox->UR, bbox->BR, p1, p2) ) return true;
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  430) 	
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  431) 	return false;
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  432) }
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  433) 
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  434) /*
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  435) // check if two cubes are intersecting
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  436) bool cubesIntersecting(glm::vec3 p1, glm::vec3 s1, glm::vec3 p2, glm::vec3 s2){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  437) 	return (
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  438) 		nearly_greater_or_eq(p1.x+s1.x/2.f, p2.x-s2.x/2.f) &&
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  439) 		nearly_greater_or_eq(p2.x+s2.x/2.f, p1.x-s1.x/2.f) &&
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  440) 		
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  441) 		nearly_greater_or_eq(p1.y+s1.y/2.f, p2.y-s2.y/2.f) &&
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  442) 		nearly_greater_or_eq(p2.y+s2.y/2.f, p1.y-s1.y/2.f) &&
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  443) 		
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  444) 		nearly_greater_or_eq(p1.z+s1.z/2.f, p2.z-s2.z/2.f) &&
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  445) 		nearly_greater_or_eq(p2.z+s2.z/2.f, p1.z-s1.z/2.f)
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  446) 	);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  447) }
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  448) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  449) // check if a line intersects another line
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  450) // adapted from: https://stackoverflow.com/a/3746601
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  451) // I have no idea how this works, but it does
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  452) bool linesIntersecting(glm::vec2 a1, glm::vec2 a2, glm::vec2 b1, glm::vec2 b2){
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  453) 	glm::vec2 b = a2 - a1;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  454) 	glm::vec2 d = b2 - b1;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  455) 	float bDotDPerp = b.x * d.y - b.y * d.x;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  456) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  457) 	// if b dot d == 0, it means the lines are parallel so have infinite intersection points
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  458) 	if (bDotDPerp == 0)
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  459) 		return false;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  460) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  461) 	glm::vec2 c = b1 - a1;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  462) 	float t = (c.x * d.y - c.y * d.x) / bDotDPerp;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  463) 	if (t < 0 || t > 1)
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  464) 		return false;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  465) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  466) 	float u = (c.x * b.y - c.y * b.x) / bDotDPerp;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  467) 	if (u < 0 || u > 1)
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  468) 		return false;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  469) 	
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  470) 	return true;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  471) }
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  472) */
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  473) 
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  474) /*
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  475) // construct player
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  476) Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  477) 	Player* player = allocateMemoryForType<Player>();
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  478) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  479) 	player->camera = camera;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  480) 	player->keymap = keymap;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  481) 	player->lockAxis = glm::vec2(0, 0);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  482) 	player->currentBbox = NULL;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  483) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  484) 	return player;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  485) }
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  486) 
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  487) glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed, double delta){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  488) 	glm::vec3 forward = glm::vec3(cos(player->camera->rotation.y), 0, sin(player->camera->rotation.y));
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  489) 	glm::vec3 side = glm::normalize( glm::cross(forward, player->camera->up) );
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  490) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  491) 	glm::vec3 directions[] = {forward, -forward, -side, side, player->camera->up, -player->camera->up};
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  492) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  493) 	glm::vec3 movement = glm::vec3(0);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  494) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  495) 	// loop through 2d keys
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  496) 	for(uint32_t i = 0; i < sizeof(directions)/sizeof(glm::vec3); i++){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  497) 		int32_t key = (&player->keymap.forward)[i];
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  498) 		
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  499) 		if(glfwGetKey(window->glfwWindow, key) == GLFW_PRESS){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  500) 			movement += directions[i];
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  501) 		}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  502) 	}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  503) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  504) 	if( glm::length2(movement) == 0 ) return movement;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  505) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  506) 	movement = glm::normalize(movement) * maxPlayerSpeed * (float)delta;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  507) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  508) 	return movement;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  509) }
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  510) 
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  511) // returns the bounding box the player is within, or null if the player isn't within any bboxes or adjacent bboxes
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  512) BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double delta, uint32_t* iterations){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  513) 	if(bbox == NULL) return NULL;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  514) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  515) 	if(iterations != NULL) (*iterations)++;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  516) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  517) 	// add to checked
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  518) 	checked->push_back(bbox);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  519) 
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  520) 	// if player is in bbox, all good
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  521) 	if(lineIntersectingBbox( glm::vec2(oldPosition.x, oldPosition.z), glm::vec2(position.x, position.z), bbox)){
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  522) 		if(bboxContains(bbox, glm::vec2(position.x, position.z))){
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  523) 			return bbox;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  524) 		} else {
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  525) 			for(uint32_t i = 0; i < bbox->adjacent->size(); i++){
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  526) 				BoundingBox* adjacent = scene->walkmap->at(bbox->adjacent->at(i));
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  527) 				
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  528) 				// make sure box hasn't been checked yet
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  529) 				if(std::find(checked->begin(), checked->end(), adjacent) != checked->end()) continue;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  530) 			
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  531) 				// check other
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  532) 				BoundingBox* other = checkBbox(adjacent, oldPosition, position, scene, checked, delta, iterations);
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  533) 				
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  534) 				// if other was found in adjacent boxes, return it
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  535) 				if(other != NULL) return other;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  536) 				
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  537) 				// otherwise keep looking
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  538) 			}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  539) 		}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  540) 	}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  541) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  542) 	// if none of the above adjacent box checks succeeded, return null
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  543) 	return NULL;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  544) }
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  545) 
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  546) // update player position from input
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  547) void updatePlayerPosition(Player* player, Scene* scene, Window* window, double delta){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  548) 	// get position of player given no interference
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  549) 	glm::vec3 movementVector = getMovementVector(player, window, scene->maxPlayerSpeed, delta);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  550) 	
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  551) 	glm::vec3 position = player->camera->position + movementVector;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  552) 
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  553) 	uint32_t iterations = 0;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  554) 
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  555) 	// check if player is within walkmap, if one exists
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  556) 	if(scene->walkmap->size() > 0){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  557) 		std::vector<BoundingBox*> checked; // vector of bboxes already checked
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  558) 		
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  559) 		BoundingBox* playerBbox = checkBbox(player->currentBbox, player->camera->position, position, scene, &checked, delta, &iterations);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  560) 		
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  561) 		// if playerBbox was found, update player bbox and call it a day
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400  562) 		if(playerBbox != NULL && player->currentBbox != NULL){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  563) 			player->currentBbox = playerBbox;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  564) 			player->lockAxis = glm::vec2(0, 0);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  565) 		} else {
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  566) 			// correct player position
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  567) 			// FIXME: the math below is overly complex and can/should be simplified + the extra bbox check isn't fun
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  568) 			
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  569) 			// first determine which side of the bounding box the player is colliding with
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  570) 			if(glm::length2(player->lockAxis) == 0){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  571) 				bool temp = position.x < player->currentBbox->UL.x || position.x > player->currentBbox->UR.x;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  572) 				glm::vec2 axis = glm::vec2(!temp, !!temp);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  573) 				
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  574) 				player->lockAxis = axis;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  575) 			}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  576) 			
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  577) 			// project movement vector along axis through dot product
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  578) 			float mvFactor = glm::dot(player->lockAxis, glm::normalize(glm::vec2(movementVector.x, movementVector.z)));
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  579) 			
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  580) 			glm::vec2 tempMv = player->lockAxis * mvFactor * scene->maxPlayerSpeed * (float)delta;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  581) 			
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  582) 			movementVector.x = tempMv.x;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  583) 			movementVector.z = tempMv.y;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  584) 			
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  585) 			position = player->camera->position + movementVector;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  586) 			
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  587) 			// refetch player bbox
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  588) 			// this is inefficient and it hurts to do
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  589) 			checked.clear();
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  590) 			
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  591) 			playerBbox = checkBbox(player->currentBbox, player->camera->position, position, scene, &checked, delta, &iterations);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  592) 			
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  593) 			if(!playerBbox){
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  594) 				position = player->camera->position;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  595) 			} else {
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  596) 				player->currentBbox = playerBbox;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  597) 			}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  598) 			
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  599) 			//printf("player exiting\n");
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  600) 		}
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  601) 		
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  602) 		// update position
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  603) 		// we make the camera 7/8 of player height to leave a bit of headroom and not look through objects above
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  604) 		float currentHeight = player->camera->position.y;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  605) 		float desiredHeight = player->currentBbox->position.y + scene->playerHeight*0.875;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  606) 		float newHeight = currentHeight + (desiredHeight - currentHeight)* std::min(scene->heightSpeed * (float)delta, 1.0f);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  607) 		
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  608) 		player->camera->position = glm::vec3(position.x, newHeight, position.z);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  609) 	} else {
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  610) 		// no walkmap
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  611) 		player->camera->position = position;
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  612) 	}
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400  613) 	
+3bb68932 (ItsTheChickenMan    2022-08-29 22:05:41 -0400  614) 	//printf("iterations: %d\n", iterations);
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  615) }
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400  616) */
+44f9e257 (Phoenix Dalla Costa 2022-08-25 13:40:38 -0400  617) 
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  618) // world
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  619) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  620) // create a block
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  621) Block* createBlock(){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  622) 	Block* block = allocateMemoryForType<Block>();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  623) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  624) 	// construct members
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  625) 	block->strings = new std::vector<std::string>();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  626) 	block->numbers = new std::vector<float>();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  627) 	block->parameterBuffer = new std::string();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  628) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  629) 	block->parameterIndex = 0;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  630) 	block->parsingSubparameters = false;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  631) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  632) 	return block;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  633) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  634) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  635) // empties out buffers and vectors, but keeps memory allocated
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  636) void emptyBlock(Block* block){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  637) 	// erase parameter buffer
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  638) 	block->parameterBuffer->clear();
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  639) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  640) 	// empty vectors
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  641) 	block->strings->clear();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  642) 	block->numbers->clear();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  643) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  644) 	// reset parameter index
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  645) 	block->parameterIndex = 0;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  646) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  647) 	block->parsingSubparameters = false;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  648) }
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  649) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  650) // completely deletes occupied memory
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  651) void destroyBlock(Block* block){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  652) 	// destruct members
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  653) 	delete block->strings;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  654) 	delete block->numbers;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  655) 	delete block->parameterBuffer;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  656) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  657) 	free(block);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  658) }
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  659) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  660) // block char parser
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  661) bool blockCharParser(Block* block, char byte){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  662) 	// ensure that block exists, create it if it doesn't
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  663) 	if(block == NULL){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  664) 		// weird problem, give up
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  665) 		return false;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  666) 	}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  667) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  668) 	if(byte == '('){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  669) 		// prevent parameter buffer from flushing early
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  670) 		block->parsingSubparameters = true;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  671) 	} else if(byte == ')'){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  672) 		// reenable flushing
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  673) 		block->parsingSubparameters = false;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  674) 	}
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  675) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  676) 	// add byte to parameter buffer if it's not equal to the parameter delimiter or the close block
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  677) 	if( (byte != parameterDelimiter && byte != blockClose) || block->parsingSubparameters ){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  678) 		block->parameterBuffer->push_back(byte);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  679) 	} else {
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  680) 		// flush parameter buffer
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400  681) 		if(block->parameterBuffer->length() > 0 && isStringNumber( *block->parameterBuffer )){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  682) 			block->numbers->push_back( std::stof(*block->parameterBuffer) );
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  683) 		} else {
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  684) 			// if string contains parenthesis, the parenthesis indicate sub-parameters
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  685) 			// split the string at the first parenthesis, and push as two separate strings
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  686) 			std::string::size_type parenthesisIndex = block->parameterBuffer->find_first_of('(');
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  687) 			
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  688) 			// found
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  689) 			if(parenthesisIndex != std::string::npos){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  690) 				// push separately
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  691) 				std::string original = block->parameterBuffer->substr(0, parenthesisIndex);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  692) 				std::string subparameters = block->parameterBuffer->substr(parenthesisIndex);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  693) 				
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  694) 				block->strings->push_back(original);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  695) 				block->strings->push_back(subparameters);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  696) 			} else {
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  697) 				block->strings->push_back( *block->parameterBuffer );
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  698) 			}
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  699) 		}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  700) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  701) 		// reset parameterBuffer
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  702) 		block->parameterBuffer->clear();
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  703) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  704) 		// if parameterIndex is at the maximum value, return true (done)
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  705) 		if(byte == blockClose){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  706) 			// block is done parsing
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  707) 			return true;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  708) 		}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  709) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  710) 		// otherwise, increment parameterIndex
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  711) 		block->parameterIndex++;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  712) 	}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  713) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  714) 	return false;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  715) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  716) 
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  717) // utility method to parse a block string into a block
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  718) // it's expected that the string is a single block ( [x,y,z,etc...] ), no delimiter
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  719) Block* parseStringToBlock(std::string blockString){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  720) 	Block* block = createBlock();
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  721) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  722) 	uint32_t byteIndex = 1; // skip block open byte
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  723) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  724) 	while(byteIndex < blockString.size()){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  725) 		char byte = blockString[byteIndex];
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  726) 		byteIndex++;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  727) 		
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  728) 		if(isspace(byte)) continue;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  729) 		
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  730) 		blockCharParser(block, byte);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  731) 	}
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  732) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  733) 	return block;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  734) }
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  735) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  736) // block to scene methods
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  737) void textureBlockToScene(Block* block, Scene* scene){
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  738) 	// validate size
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  739) 	uint32_t numStrings = 2;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  740) 	if(block->strings->size() < numStrings){
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  741) 		printf("Not enough parameters for texture block (only %d strings present when %d were expected)\n", block->strings->size(), numStrings);
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  742) 		return;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  743) 	}
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  744) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  745) 	// load values
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  746) 	std::string texturePath = block->strings->at(0);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  747) 	std::string textureName = block->strings->at(1);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  748) 	
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  749) 	texturePath = (*scene->gameDir) + texturesPath + texturePath;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  750) 	
+d25a4226 (Phoenix Dalla Costa 2022-08-23 21:11:10 -0400  751) 	// exclude required special textures
+d25a4226 (Phoenix Dalla Costa 2022-08-23 21:11:10 -0400  752) 	if(textureName == "invisible") return;
+d25a4226 (Phoenix Dalla Costa 2022-08-23 21:11:10 -0400  753) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  754) 	// load texture
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  755) 	(*scene->textures)[textureName] = createTextureData(texturePath.c_str());
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  756) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  757) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  758) void vertexDataBlockToScene(Block* block, Scene* scene){
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  759) 	// validate size
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  760) 	uint32_t numStrings = 2;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  761) 	if(block->strings->size() < numStrings){
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  762) 		printf("Not enough parameters for vertex data block (only %d strings present when %d were expected)\n", block->strings->size(), numStrings);
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  763) 		return;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  764) 	}
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  765) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  766) 	// load values
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  767) 	std::string shapeName = block->strings->at(0);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  768) 	std::string vertexDataName = block->strings->at(1);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  769) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  770) 	// load vertex data
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  771) 	VertexDataInfo info = g_shapes[shapeName];
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  772) 	
+d25a4226 (Phoenix Dalla Costa 2022-08-23 21:11:10 -0400  773) 	// FIXME: have createVertexData accept VertexDataInfo as a parameter instead of each individually (or both)
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  774) 	(*scene->vertexData)[vertexDataName] = createVertexData(info.vertices, info.vertexCount, info.sizeInBytes, info.componentOrder, info.numComponents);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  775) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  776) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  777) void objectBlockToScene(Block* block, Scene* scene){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  778) 	// load some float values
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  779) 	if(block->numbers->size() < 9){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  780) 		printf("Not enough enough parameters in an object block (only %d numbers and %d strings present)\n", block->numbers->size(), block->strings->size());
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  781) 		return;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  782) 	}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  783) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  784) 	float x = block->numbers->at(0);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  785) 	float y = block->numbers->at(1);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  786) 	float z = block->numbers->at(2);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  787) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  788) 	float rx = block->numbers->at(3);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  789) 	float ry = block->numbers->at(4);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  790) 	float rz = block->numbers->at(5);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  791) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  792) 	float w = block->numbers->at(6);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  793) 	float h = block->numbers->at(7);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  794) 	float d = block->numbers->at(8);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  795) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  796) 	glm::vec3 position = glm::vec3(x, y, z);
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  797) 	glm::vec3 rotation = glm::vec3(glm::radians(rx), glm::radians(ry), glm::radians(rz));
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  798) 	glm::vec3 scale = glm::vec3(w, h, d);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  799) 	
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  800) 	// check amount of strings
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  801) 	uint32_t stringParams = block->strings->size();
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  802) 	
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  803) 	// first check if string params contains a special keyword
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  804) 	// TODO: maybe write a better system for this?
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  805) 	if(stringParams > 1){
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  806) 		// loop breaks when there are no more keyword
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  807) 		bool keywordsLeft = true;
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  808) 		
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  809) 		while(keywordsLeft){
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  810) 			std::string keyword = block->strings->at(stringParams-1);
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  811) 			
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  812) 			if(keyword == "nowalk"){
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  813) 				// nowalk is for walkmap parser only, so just get rid of the keyword and move on
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  814) 				stringParams--;
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  815) 			} else if(keyword == "invisible"){
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  816) 				// ignore object completely
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  817) 				// no cleanup necessary
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  818) 				return;
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  819) 			} else {
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  820) 				keywordsLeft = false;
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  821) 			}
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  822) 		}
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  823) 	}
+e4a3dd42 (Phoenix Dalla Costa 2022-08-24 16:18:29 -0400  824) 	
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  825) 	// mode depends on number of string parameters (1 = model, 2 = texture + vertexData)
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  826) 	switch(stringParams){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  827) 		case 0: {
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  828) 			printf("There weren't enough string parameters in an object block (only %d present)\n", block->strings->size());
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  829) 			return;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  830) 		}
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  831) 		
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  832) 		case 1: {
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  833) 			// load values
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  834) 			std::string modelName = block->strings->at(0);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  835) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  836) 			// load model
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  837) 			Model* model = (*scene->models)[modelName];
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  838) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  839) 			// check model
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  840) 			if(!model){
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  841) 				// FIXME: fix the various potential memory leaks in these methods when exiting too early to delete heap memory
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  842) 				printf("Invalid model name %s\n", modelName.c_str());
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  843) 				return; // fail
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  844) 			}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  845) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  846) 			// split model in textured renderable objects
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  847) 			for(uint32_t i = 0; i < model->meshes->size(); i++){
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  848) 				Mesh* mesh = model->meshes->at(i);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  849) 				
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  850) 				// create renderable object from mesh
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  851) 				RenderableObject* object = createRenderableObject(mesh->vertexData, position, rotation, scale);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  852) 				
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  853) 				// create textured renderable object from renderable object and texture/color
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  854) 				TexturedRenderableObject* texturedObject;
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  855) 				
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  856) 				if(mesh->texture){
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  857) 					texturedObject = createTexturedRenderableObject(object, mesh->texture);
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  858) 				} else {
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  859) 					texturedObject = createTexturedRenderableObject(object, mesh->color);
+df85daed (Phoenix Dalla Costa 2022-08-11 12:08:25 -0400  860) 				}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  861) 				
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  862) 				// push to scene
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  863) 				std::vector<TexturedRenderableObject*>* objectVector = (*scene->staticObjects)[mesh->vertexData];
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  864) 				
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  865) 				if(!objectVector){
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  866) 					objectVector = new std::vector<TexturedRenderableObject*>();
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  867) 					
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  868) 					(*scene->staticObjects)[mesh->vertexData] = objectVector;
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  869) 				}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  870) 				
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  871) 				objectVector->push_back(texturedObject);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  872) 			}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  873) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  874) 			break;
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  875) 		}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  876) 		case 2: {
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  877) 			// load values
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  878) 			std::string textureName = block->strings->at(0);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  879) 			std::string vertexDataName = block->strings->at(1);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  880) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  881) 			// check texture
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  882) 			TextureData* texture = (*scene->textures)[textureName];
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  883) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  884) 			if(!texture){
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  885) 				printf("Invalid texture name %s", textureName.c_str());
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  886) 				
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  887) 				TextureData* def = (*scene->textures)["default"];
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  888) 				
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  889) 				if(def){
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  890) 					texture = def;
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  891) 					printf(", reverting to default\n");
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  892) 				} else {
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400  893) 					printf(" with no default present\n");
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  894) 					
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  895) 					return; // fail
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  896) 				}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  897) 			}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  898) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  899) 			// check vertex data
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  900) 			VertexData* vData = (*scene->vertexData)[vertexDataName];
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  901) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  902) 			if(!vData){
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  903) 				printf("Invalid vertex data name %s\n", vertexDataName.c_str());
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  904) 				
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  905) 				return; // fail
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  906) 			}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  907) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  908) 			// create object
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  909) 			TexturedRenderableObject* object = createTexturedRenderableObject(vData, position, rotation, scale, texture);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  910) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  911) 			// push to scene
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  912) 			std::vector<TexturedRenderableObject*>* objectVector = (*scene->staticObjects)[vData];
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  913) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  914) 			if(!objectVector){
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  915) 				objectVector = new std::vector<TexturedRenderableObject*>();
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  916) 				
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  917) 				(*scene->staticObjects)[vData] = objectVector;
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  918) 			}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  919) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  920) 			objectVector->push_back(object);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  921) 			
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  922) 			break;
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  923) 		}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  924) 	}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  925) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  926) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  927) void lightBlockToScene(Block* block, Scene* scene){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  928) 	// validate size
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  929) 	if(block->numbers->size() < 11){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  930) 		printf("Not enough parameters for light block (only %d numbers present)\n", block->numbers->size());
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  931) 		return;
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  932) 	}
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  933) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400  934) 	// load values
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  935) 	float x = block->numbers->at(0);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  936) 	float y = block->numbers->at(1);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  937) 	float z	= block->numbers->at(2);
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  938) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  939) 	float r = block->numbers->at(3);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  940) 	float g = block->numbers->at(4);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  941) 	float b = block->numbers->at(5);
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  942) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  943) 	float c = block->numbers->at(6);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  944) 	float l = block->numbers->at(7);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  945) 	float q = block->numbers->at(8);
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  946) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  947) 	float as = block->numbers->at(9);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  948) 	float ds = block->numbers->at(10);
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  949) 	
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  950) 	glm::vec3 position = glm::vec3(x, y, z);
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  951) 	glm::vec3 color = glm::vec3(r, g, b);
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  952) 	
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  953) 	// create light
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  954) 	PointLight* light = createPointLight(position, color, as, ds, c, l, q);
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  955) 	
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  956) 	// add to scene
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400  957) 	scene->pointLights->push_back(light);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  958) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400  959) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  960) void modelBlockToScene(Block* block, Scene* scene){
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  961) 	// validate size
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  962) 	uint32_t numStrings = 2;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  963) 	if(block->strings->size() < numStrings){
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  964) 		printf("Not enough parameters for model block (only %d strings present when %d were expected)\n", block->strings->size(), numStrings);
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  965) 		return;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  966) 	}
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  967) 	
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  968) 	// load values
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  969) 	std::string modelPath = block->strings->at(0);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  970) 	std::string modelName = block->strings->at(1);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  971) 	
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  972) 	modelPath = (*scene->gameDir) + modelsPath + modelPath;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  973) 	
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  974) 	// load model
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400  975) 	Model* model = loadModel(modelPath);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  976) 	
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  977) 	if(!model){
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  978) 		return; // fail
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  979) 	}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  980) 	
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  981) 	(*scene->models)[modelName] = model;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  982) }
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  983) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  984) void walkBoxBlockToScene(Block* block, Scene* scene){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  985) 	// load values
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  986) 	float x = block->numbers->at(0);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  987) 	float y = block->numbers->at(1);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  988) 	float z	= block->numbers->at(2);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  989) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  990) 	float w = block->numbers->at(3);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  991) 	float d = block->numbers->at(4);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  992) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  993) 	glm::vec3 position = glm::vec3(x, y, z);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  994) 	glm::vec2 size = glm::vec2(w, d);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  995) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  996) 	// create bounding box
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  997) 	BoundingBox* box = createBbox(position, size);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400  998) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400  999) 	// add adjacents
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1000) 	for(uint32_t i = 5; i < block->numbers->size(); i++){
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1001) 		// convert float to int index
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1002) 		uint32_t index = (uint32_t)block->numbers->at(i) + scene->walkmapOffset;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1003) 		
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1004) 		// add index to box adjacents
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1005) 		box->adjacent->push_back(index);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1006) 	}
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400 1007) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1008) 	// add to scene
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1009) 	scene->walkmap->push_back(box);
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400 1010) }
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400 1011) 
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1012) void settingsBlockToScene(Block* block, Scene* scene){
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1013) 	// block for misc settings
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1014) 	
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1015) 	// because memory is sequential in structs, this acts as an array of settings
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1016) 	float* settings = &(scene->playerHeight);
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1017) 	
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1018) 	// loop through numbers and load them to settings
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1019) 	for(uint32_t i = 0; i < block->numbers->size(); i++){
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1020) 		settings[i] = block->numbers->at(i);
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1021) 	}
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1022) }
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1023) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1024) void triggerBlockToScene(Block* block, Scene* scene){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1025) 	// validate size
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1026) 	uint32_t numNums = 6;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1027) 	uint32_t numStrings = 2;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1028) 	if(block->numbers->size() < numNums || block->strings->size() < numStrings){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1029) 		printf("Not enough parameters in trigger block (only %d numbers and %d strings present when %d and %d were expected)\n", block->numbers->size(), block->strings->size(), numNums, numStrings);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1030) 		return;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1031) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1032) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1033) 	// load float values
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1034) 	glm::vec3 position;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1035) 	glm::vec3 scale;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1036) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1037) 	// first three floats should be position
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1038) 	for(uint32_t i = 0; i < 3; i++){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1039) 		(&position.x)[i] = block->numbers->at(i);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1040) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1041) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1042) 	// next three floats should be scale
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1043) 	for(uint32_t i = 3; i < 6; i++){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400 1044) 		(&scale.x)[i-3] = block->numbers->at(i);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1045) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1046) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1047) 	// load strings
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1048) 	std::string event = block->strings->at(0);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1049) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1050) 	// check that event is valid
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1051) 	if(!g_eventCheckers.count(event)){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1052) 		printf("Invalid event name %s\n", event.c_str());
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1053) 		
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1054) 		return;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1055) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1056) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1057) 	// null unless there are event parameters
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1058) 	Block* eventParametersBlock = NULL;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1059) 	std::vector<std::string>* eventStringParameters = NULL;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1060) 	std::vector<float>* eventNumberParameters = NULL;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1061) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1062) 	uint32_t actionsIndex = 1;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1063) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1064) 	// check for subparameters
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1065) 	if(block->strings->at(1)[0] == '('){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1066) 		std::string eventParametersString = block->strings->at(1);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1067) 		
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1068) 		// replace parenthesis with blockClose, to parse normally
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1069) 		eventParametersString[eventParametersString.size()-1] = blockClose;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1070) 		
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1071) 		eventParametersBlock = parseStringToBlock(eventParametersString);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1072) 		
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1073) 		eventStringParameters = eventParametersBlock->strings;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1074) 		eventNumberParameters = eventParametersBlock->numbers;
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400 1075) 		
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400 1076) 		actionsIndex++;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1077) 	}
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1078) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1079) 	std::string action = block->strings->at(actionsIndex);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1080) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1081) 	// check that action is valid
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1082) 	if(!g_triggerActions.count(action)){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1083) 		printf("Invalid action name %s\n", action.c_str());
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1084) 		
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1085) 		return;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1086) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1087) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1088) 	// get action subparameters
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1089) 	std::string actionParametersString = block->strings->at(actionsIndex+1);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1090) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1091) 	// replace parenthesis with blockOpen/blockClose, to parse normally
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1092) 	actionParametersString[actionParametersString.size()-1] = blockClose;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1093) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1094) 	Block* actionParametersBlock = parseStringToBlock(actionParametersString);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1095) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1096) 	// create trigger info
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1097) 	// copies values from vectors, so no worries about bad memory here
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1098) 	TriggerInfo* info = createTriggerInfo(position, scale, eventStringParameters, eventNumberParameters, actionParametersBlock->strings, actionParametersBlock->numbers, action);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1099) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1100) 	// store to scene triggers
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1101) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1102) 	// construct vector for trigger if it doesn't exist
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1103) 	std::vector<TriggerInfo*>* triggers = (*scene->triggers)[event];
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1104) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1105) 	if(!triggers){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1106) 		triggers = new std::vector<TriggerInfo*>();
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1107) 		
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1108) 		(*scene->triggers)[event] = triggers;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1109) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1110) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1111) 	triggers->push_back(info);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1112) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1113) 	// destroy blocks
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1114) 	if(eventParametersBlock != NULL){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1115) 		destroyBlock(eventParametersBlock); // also destroys vectors
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1116) 	}
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1117) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1118) 	destroyBlock(actionParametersBlock);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1119) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1120) 
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1121) void audioBlockToScene(Block* block, Scene* scene){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1122) 	// validate size
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1123) 	uint32_t numStrings = 2;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1124) 	if(block->strings->size() < numStrings){
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1125) 		printf("Not enough parameters for audio block (only %d strings present when %d were expected)\n", block->strings->size(), numStrings);
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1126) 		return;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1127) 	}
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1128) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1129) 	// load audio
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400 1130) 	std::string audioPath = block->strings->at(0);
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400 1131) 	std::string audioName = block->strings->at(1);
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400 1132) 	
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400 1133) 	audioPath = (*scene->gameDir) + soundsPath + audioPath;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1134) 	
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400 1135) 	loadSoundFile(audioPath, audioName);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1136) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1137) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1138) // copies the elements from numbers and strings
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1139) TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<std::string>* eventStrings, std::vector<float>* eventNumbers, std::vector<std::string>* strings, std::vector<float>* numbers, std::string action){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1140) 	// check that action exists before doing anything
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400 1141) 	if(!g_triggerActions.count(action)){
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400 1142) 		printf("Invalid action %s for trigger info\n", action.c_str());
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400 1143) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1144) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1145) 	TriggerInfo* info = allocateMemoryForType<TriggerInfo>();
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1146) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1147) 	info->position = position;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1148) 	info->scale = scale;
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1149) 	info->eventStrings = eventStrings == NULL ? new std::vector<std::string>() : new std::vector<std::string>( *eventStrings );
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1150) 	info->eventNumbers = eventNumbers == NULL ? new std::vector<float>() : new std::vector<float>( *eventNumbers );
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1151) 	info->strings = new std::vector<std::string>( *strings );
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1152) 	info->numbers = new std::vector<float>( *numbers );
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1153) 	info->reserved = new std::vector<int32_t>();
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1154) 	info->action = g_triggerActions.at(action);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1155) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1156) 	return info;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1157) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1158) 
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1159) // create the shell of a scene
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400 1160) // also initializes player currentBbox
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1161) Scene* createScene(Window* window, std::string gameDir){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1162) 	// allocate memory
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1163) 	Scene* scene = allocateMemoryForType<Scene>();
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1164) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1165) 	// initialize values
+8ec818de (Phoenix Dalla Costa 2022-08-25 22:57:52 -0400 1166) 	scene->window = window;
+b107d6c3 (ItsTheChickenMan    2022-08-29 23:52:45 -0400 1167) 	scene->gameDir = new std::string(gameDir);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1168) 	scene->vertexData = new std::map<std::string, VertexData*>();
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1169) 	scene->textures = new std::map<std::string, TextureData*>();
+fb1423ab (Phoenix Dalla Costa 2022-08-11 01:10:01 -0400 1170) 	scene->models = new std::map<std::string, Model*>();
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1171) 	scene->staticObjects = new std::map<VertexData*, std::vector<TexturedRenderableObject*>*>();
+3a28cad7 (Phoenix Dalla Costa 2022-08-09 00:28:00 -0400 1172) 	scene->pointLights = new std::vector<PointLight*>();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1173) 	scene->walkmap = new std::vector<BoundingBox*>();
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1174) 	scene->triggers = new std::map<std::string, std::vector<TriggerInfo*>*>();
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1175) 	scene->walkmapOffset = 0;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1176) 	scene->frame = 0;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1177) 	
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1178) 	// default settings
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1179) 	scene->playerHeight = 2.f;
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1180) 	scene->playerRadius = 0.5f;
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1181) 	scene->stepHeight = 0.4f;
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1182) 	scene->maxPlayerSpeed = 2.f;
+849bb4d8 (Phoenix Dalla Costa 2022-08-29 15:02:50 -0400 1183) 	scene->heightSpeed = 10.f;
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1184) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1185) 	return scene;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1186) }
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1187) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1188) // parse a world file into an existing scene
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1189) void parseWorldIntoScene(Scene* scene, const char* file){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1190) 	// file buffer
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1191) 	char* fileBuffer = read_entire_file(file);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1192) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1193) 	if(fileBuffer == NULL){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1194) 		printf("Invalid path for world %s\n", file);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1195) 		return;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1196) 	}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1197) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1198) 	// settings
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1199) 	char blockDelimiters[] = {textureBlockDelimiter, vertexDataBlockDelimiter, objectBlockDelimiter, lightBlockDelimiter, modelBlockDelimiter, walkBoxBlockDelimiter, settingsBlockDelimiter, triggerBlockDelimiter, audioBlockDelimiter};
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1200) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1201) 	// control states
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1202) 	bool parsingBlock = false;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1203) 	bool ignoringUntilNextLine = false;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1204) 	int32_t blockParsing = -1;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1205) 	Block* blockBuffer = createBlock();
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1206) 	
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1207) 	// block parsers
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1208) 	void (*blockParsers[9])(Block*,Scene*) {textureBlockToScene, vertexDataBlockToScene, objectBlockToScene, lightBlockToScene, modelBlockToScene, walkBoxBlockToScene, settingsBlockToScene, triggerBlockToScene, audioBlockToScene};
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1209) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1210) 	// loop through each byte
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1211) 	char byte;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1212) 	char lastByte;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1213) 	uint32_t byteIndex = 0;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1214) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1215) 	//printf("\n");
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1216) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1217) 	do {
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1218) 		// load byte
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1219) 		byte = fileBuffer[byteIndex];
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1220) 		if(byteIndex > 0) lastByte = fileBuffer[byteIndex-1];
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1221) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1222) 		uint32_t index = byteIndex;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1223) 		byteIndex++;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1224) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1225) 		// if currently in a comment, check for newline
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1226) 		if(ignoringUntilNextLine){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1227) 			// check for newline
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1228) 			if(byte == '\n'){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1229) 				ignoringUntilNextLine = false;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1230) 			}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1231) 			
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1232) 			continue;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1233) 		}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1234) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1235) 		// check for whitespace (ignored)
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1236) 		if(isspace(byte)) continue;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1237) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1238) 		// check for hashtag (comment, ignores)
+f42923c9 (Phoenix Dalla Costa 2022-08-25 22:32:41 -0400 1239) 		if( byte == commentDelimiter ){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1240) 			ignoringUntilNextLine = true;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1241) 			continue;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1242) 		}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1243) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1244) 		// byte parser
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1245) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1246) 		// if a block isn't being parsed currently, look for a delimiter
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1247) 		if(blockParsing < 0){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1248) 			// look for delimiter
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1249) 			for(int32_t i = 0; i < sizeof(blockDelimiters)/sizeof(char); i++){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1250) 				if(byte == blockDelimiters[i]){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1251) 					blockParsing = i;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1252) 					
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1253) 					// skip block open
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1254) 					byteIndex++;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1255) 					
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1256) 					break;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1257) 				}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1258) 			}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1259) 			
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1260) 			continue;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1261) 		}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1262) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1263) 		// if a block is being parsed, pass the byte to the block parser function
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1264) 		bool done = (*blockCharParser)(blockBuffer, byte);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1265) 		
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1266) 		if(done){
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1267) 			// parse block into scene
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1268) 			(*blockParsers[blockParsing])(blockBuffer, scene);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1269) 			
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1270) 			// reset block parsing (blockBuffer is freed by block parser when done)
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1271) 			blockParsing = -1;
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1272) 			
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1273) 			// empty the block
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1274) 			emptyBlock(blockBuffer);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1275) 		}
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1276) 	} while( byte != 0 ); // end at null terminator
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1277) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1278) 	free(fileBuffer);
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1279) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1280) 	destroyBlock(blockBuffer);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1281) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1282) 	// update walkmap offset
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1283) 	scene->walkmapOffset = scene->walkmap->size();
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1284) }
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1285) 
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1286) // parse world
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1287) Scene* parseWorld(const char* file, Window* window, std::string gameDir){
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1288) 	Scene* scene = createScene(window, gameDir);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1289) 	
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1290) 	parseWorldIntoScene(scene, file);
+0fa0d54a (Phoenix Dalla Costa 2022-08-19 11:10:55 -0400 1291) 	
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1292) 	return scene;
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1293) }
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1294) 
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1295) // deallocate a scene's memory + any memory it dynamically allocates in construction
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1296) // this is very dangerous to call!  make sure that no pointers to anything in the scene exist, and no more calls to the scene are made
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1297) // everything in the scene is deallocated except for:
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1298) // 	Window* window
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1299) void destroyScene(Scene* scene){
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1300) 	// deallocate all renderable objects
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1301) 	for(std::map<VertexData*, std::vector<TexturedRenderableObject*>*>::iterator it = scene->staticObjects->begin(); it != scene->staticObjects->end(); it++){
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1302) 		for(uint32_t j = 0; j < it->second->size(); j++){
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1303) 			
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1304) 		}
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1305) 	}
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1306) }
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1307) 
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1308) 
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1309) // check if scene has walkmap
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1310) bool hasWalkmap(Scene* scene){
+93345a5b (Phoenix Dalla Costa 2022-08-22 16:21:51 -0400 1311) 	return scene->walkmap->size() > 0;
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1312) }
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1313) 
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1314) // check triggers for scene
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1315) void checkTriggers(Scene* scene, Player* player){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1316) 	// loop through every TriggerInfo
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1317) 	for(std::map<std::string, std::vector<TriggerInfo*>*>::iterator it = scene->triggers->begin(); it != scene->triggers->end(); it++){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1318) 		// load checker function
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1319) 		EventCheckFunction checker = g_eventCheckers.at(it->first);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1320) 		
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1321) 		// loop through every trigger of this event
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1322) 		for(uint32_t i = 0; i < it->second->size(); i++){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1323) 			TriggerInfo* triggerInfo = it->second->at(i);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1324) 			
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1325) 			// check if we need to fire this trigger
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400 1326) 			
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400 1327) 			// intersecting is always true if the bounding cube's scale is all zeroes
+00000000 (Not Committed Yet   2022-10-30 14:50:22 -0400 1328) 			bool intersecting = glm::length2(triggerInfo->scale) == 0.0f || cubesIntersecting(glm::vec3(player->camera->position.x, player->camera->position.y - scene->playerHeight*0.375f, player->camera->position.z), glm::vec3(scene->playerRadius, scene->playerHeight, scene->playerRadius), triggerInfo->position, triggerInfo->scale);
+7c08a4e0 (Phoenix Dalla Costa 2022-08-25 16:10:46 -0400 1329) 			bool fire = (*checker)(scene, triggerInfo, intersecting);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1330) 			
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1331) 			if(fire){
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1332) 				// fire at will
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1333) 				(*triggerInfo->action)(scene, triggerInfo);
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1334) 			}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1335) 		}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1336) 	}
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1337) 	
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1338) 	// increment scene frame
+8c05ef83 (Phoenix Dalla Costa 2022-08-24 23:52:22 -0400 1339) 	scene->frame++;
+11a92f75 (Phoenix Dalla Costa 2022-08-08 22:11:29 -0400 1340) }

@@ -56,9 +56,13 @@ const std::map<std::string, EventCheckFunction> g_eventCheckers = {
 // this map is for storing action methods for each action name
 const std::map<std::string, TriggerActionFunction> g_triggerActions = {
 	{"logToConsole", logToConsole},
+	
 	{"changeSetting", changeSetting},
+
 	{"playBackgroundMusic", playBackgroundMusicAction},
+	
 	{"setBackgroundMusicSettings", setBackgroundMusicSettings},
+
 	{"playAudio", playAudio}
 };
 
@@ -75,7 +79,7 @@ bool onStartChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube)
 
 bool onEnterChecker(Scene* scene, TriggerInfo* triggerInfo, bool inBoundingCube){
 	// if this is the first frame, add some extra trigger related info to triggerInfo
-	// this shouldn't cause any issues because triggers can't be created dynamically, so all valid triggers should be checked on the first checkTriggers call
+	// this shouldn't cause any issues because triggers can only be created when the scene is first loaded, so all valid triggers should be checked on the first checkTriggers call
 	if(scene->frame == 0){
 		// this value is equal to the last frame in which the player was intersecting the bounding box.  the trigger will never fire between two consecutive frames
 		triggerInfo->reserved->push_back(0);
@@ -354,6 +358,12 @@ TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData,
 	return createTexturedRenderableObject(object, texture);
 }
 
+// destroys renderable object
+// leaves texture data
+void destroyTexturedRenderableObject(TexturedRenderableObject* texturedObject){
+	
+}
+
 // bounding box constructors
 
 // create bounding box with 2d position
@@ -406,6 +416,22 @@ bool bboxContains(BoundingBox* bbox, glm::vec2 point){
 	);
 }
 
+// check if a line intersects a bbox
+// FIXME: could be more efficient since a lot of recalculation seems to happen in linesIntersecting
+bool lineIntersectingBbox(glm::vec2 p1, glm::vec2 p2, BoundingBox* bbox){
+	// if bbox contains both points of line, return true
+	// this is technically not how this function should behave, but it works fine here
+	if( bboxContains(bbox, p1) && bboxContains(bbox, p2) ) return true;
+	
+	if( linesIntersecting(bbox->UL, bbox->UR, p1, p2) ) return true;
+	if( linesIntersecting(bbox->BL, bbox->BR, p1, p2) ) return true;
+	if( linesIntersecting(bbox->UL, bbox->BL, p1, p2) ) return true;
+	if( linesIntersecting(bbox->UR, bbox->BR, p1, p2) ) return true;
+	
+	return false;
+}
+
+/*
 // check if two cubes are intersecting
 bool cubesIntersecting(glm::vec3 p1, glm::vec3 s1, glm::vec3 p2, glm::vec3 s2){
 	return (
@@ -443,22 +469,9 @@ bool linesIntersecting(glm::vec2 a1, glm::vec2 a2, glm::vec2 b1, glm::vec2 b2){
 	
 	return true;
 }
+*/
 
-// check if a line intersects a bbox
-// FIXME: could be more efficient since a lot of recalculation seems to happen in linesIntersecting
-bool lineIntersectingBbox(glm::vec2 p1, glm::vec2 p2, BoundingBox* bbox){
-	// if bbox contains both points of line, return true
-	// this is technically not how this function should behave, but it works fine here
-	if( bboxContains(bbox, p1) && bboxContains(bbox, p2) ) return true;
-	
-	if( linesIntersecting(bbox->UL, bbox->UR, p1, p2) ) return true;
-	if( linesIntersecting(bbox->BL, bbox->BR, p1, p2) ) return true;
-	if( linesIntersecting(bbox->UL, bbox->BL, p1, p2) ) return true;
-	if( linesIntersecting(bbox->UR, bbox->BR, p1, p2) ) return true;
-	
-	return false;
-}
-
+/*
 // construct player
 Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap){
 	Player* player = allocateMemoryForType<Player>();
@@ -600,6 +613,7 @@ void updatePlayerPosition(Player* player, Scene* scene, Window* window, double d
 	
 	//printf("iterations: %d\n", iterations);
 }
+*/
 
 // world
 
@@ -1144,13 +1158,12 @@ TriggerInfo* createTriggerInfo(glm::vec3 position, glm::vec3 scale, std::vector<
 
 // create the shell of a scene
 // also initializes player currentBbox
-Scene* createScene(Window* window, Player* player, std::string gameDir){
+Scene* createScene(Window* window, std::string gameDir){
 	// allocate memory
 	Scene* scene = allocateMemoryForType<Scene>();
 	
 	// initialize values
 	scene->window = window;
-	scene->player = player;
 	scene->gameDir = new std::string(gameDir);
 	scene->vertexData = new std::map<std::string, VertexData*>();
 	scene->textures = new std::map<std::string, TextureData*>();
@@ -1268,40 +1281,38 @@ void parseWorldIntoScene(Scene* scene, const char* file){
 	
 	// update walkmap offset
 	scene->walkmapOffset = scene->walkmap->size();
-	
-	// player setup
-	// determine currentBox if null
-	if(scene->player->currentBbox == NULL && scene->walkmap->size() > 0){
-		for(uint32_t i = 0; i < scene->walkmap->size(); i++){
-			if(bboxContains(scene->walkmap->at(i), glm::vec2(scene->player->camera->position.x, scene->player->camera->position.z))){
-				scene->player->currentBbox = scene->walkmap->at(i);
-				
-				break;
-			}
-		}
-		
-		if(scene->player->currentBbox == NULL){
-			scene->player->currentBbox = scene->walkmap->at(0);
-			scene->player->camera->position = scene->player->currentBbox->position; // height should correct itself
-		}
-	}
 }
 
 // parse world
-Scene* parseWorld(const char* file, Window* window, Player* player, std::string gameDir){
-	Scene* scene = createScene(window, player, gameDir);
+Scene* parseWorld(const char* file, Window* window, std::string gameDir){
+	Scene* scene = createScene(window, gameDir);
 	
 	parseWorldIntoScene(scene, file);
 	
 	return scene;
 }
 
+// deallocate a scene's memory + any memory it dynamically allocates in construction
+// this is very dangerous to call!  make sure that no pointers to anything in the scene exist, and no more calls to the scene are made
+// everything in the scene is deallocated except for:
+// 	Window* window
+void destroyScene(Scene* scene){
+	// deallocate all renderable objects
+	for(std::map<VertexData*, std::vector<TexturedRenderableObject*>*>::iterator it = scene->staticObjects->begin(); it != scene->staticObjects->end(); it++){
+		for(uint32_t j = 0; j < it->second->size(); j++){
+			
+		}
+	}
+}
+
+
+// check if scene has walkmap
 bool hasWalkmap(Scene* scene){
 	return scene->walkmap->size() > 0;
 }
 
 // check triggers for scene
-void checkTriggers(Scene* scene){
+void checkTriggers(Scene* scene, Player* player){
 	// loop through every TriggerInfo
 	for(std::map<std::string, std::vector<TriggerInfo*>*>::iterator it = scene->triggers->begin(); it != scene->triggers->end(); it++){
 		// load checker function
@@ -1314,7 +1325,7 @@ void checkTriggers(Scene* scene){
 			// check if we need to fire this trigger
 			
 			// intersecting is always true if the bounding cube's scale is all zeroes
-			bool intersecting = glm::length2(triggerInfo->scale) == 0.0f || cubesIntersecting(glm::vec3(scene->player->camera->position.x, scene->player->camera->position.y - scene->playerHeight*0.375f, scene->player->camera->position.z), glm::vec3(scene->playerRadius, scene->playerHeight, scene->playerRadius), triggerInfo->position, triggerInfo->scale);
+			bool intersecting = glm::length2(triggerInfo->scale) == 0.0f || cubesIntersecting(glm::vec3(player->camera->position.x, player->camera->position.y - scene->playerHeight*0.375f, player->camera->position.z), glm::vec3(scene->playerRadius, scene->playerHeight, scene->playerRadius), triggerInfo->position, triggerInfo->scale);
 			bool fire = (*checker)(scene, triggerInfo, intersecting);
 			
 			if(fire){

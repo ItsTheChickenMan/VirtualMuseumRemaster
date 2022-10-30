@@ -39,34 +39,6 @@ struct BoundingBox {
 	std::vector<uint32_t>* adjacent;
 };
 
-// map of keys to certain controls
-struct Keymap {
-	int32_t forward;
-	int32_t backward;
-	int32_t left;
-	int32_t right;
-	
-	int32_t up;
-	int32_t down;
-	
-	int32_t slow;
-	int32_t fast;
-};
-
-struct Player {
-	// camera
-	PerspectiveCamera* camera;
-	
-	// map of keys corresponding to certain controls
-	Keymap keymap;
-	
-	// last bounding box the player was standing on
-	BoundingBox* currentBbox;
-	
-	// if the player is currently locked to an axis (by the edge of a bbox) then this is set to the axis, otherwise it's set to 0, 0
-	glm::vec2 lockAxis;
-};
-
 // textured renderable object
 struct TexturedRenderableObject {
 	TextureData* textureData;
@@ -96,16 +68,45 @@ struct TriggerInfo {
 	TriggerActionFunction action;
 };
 
+// map of keys to certain controls
+struct Keymap {
+	int32_t forward;
+	int32_t backward;
+	int32_t left;
+	int32_t right;
+	
+	int32_t up;
+	int32_t down;
+	
+	int32_t slow;
+	int32_t fast;
+};
+
+// contains information required for a player to interact
+struct Player {
+	// camera
+	PerspectiveCamera* camera;
+	
+	// map of keys corresponding to certain controls
+	Keymap keymap;
+	
+	// last bounding box the player was standing on
+	BoundingBox* currentBbox;
+	
+	// if the player is currently locked to an axis (by the edge of a bbox) then this is set to the axis, otherwise it's set to 0, 0
+	glm::vec2 lockAxis;
+	
+	// mouse sensitivity
+	// FIXME: not sure where else to put this, but putting it here goes against the precedent set by other settings
+	float mouseSensitivity;
+};
+
 // scene
 // contain static renderable objects
 struct Scene {
 	// window
 	Window* window;
 	
-	// player
-	Player* player;
-	
-	// game directory
 	std::string* gameDir;
 	
 	// loaded vertex data
@@ -146,7 +147,7 @@ struct Scene {
 	// the rate at which updatePlayerPosition should approach the desired height
 	// the formula for the player height given a desired height is:
 	// currentHeight + (desiredHeight - currentHeight) * min(heightSpeed*delta, 1)
-	// note that the delta correction isn't perfect and results in slightly faster speeds as framerate increases, and is only noticeable wrong at really low framerates (less than 5 fps).  At reasonable height speeds and reasonable frame rates, the difference is negligible (<0.5 seconds to reach desired height)
+	// note that the delta correction isn't perfect and results in slightly faster speeds as framerate increases, and is only noticeable wrong at really low framerates (less than 5 fps).  At reasonable height speeds and reasonable frame rates, the difference is negligible (<0.5 seconds difference to reach desired height)
 	// the delta correction results in heightSpeed's units being approximately percentage / second, so I advise taking that into consideration when aiming for a good height speed
 	float heightSpeed;
 };
@@ -223,22 +224,13 @@ TexturedRenderableObject* createTexturedRenderableObject(VertexData* vertexData,
 BoundingBox* createBbox(glm::vec2 p, glm::vec2 s);
 BoundingBox* createBbox(glm::vec3 p, glm::vec2 s);
 BoundingBox* createBbox(BoundingBox* original);
-
 bool bboxContains(BoundingBox* box, glm::vec2 point);
-bool cubesIntersecting(glm::vec3 p1, glm::vec3 s1, glm::vec3 p2, glm::vec3 s2);
-bool linesIntersecting(glm::vec2 a1, glm::vec2 a2, glm::vec2 b1, glm::vec2 b2);
 bool lineIntersectingBbox(glm::vec2 p1, glm::vec2 p2, BoundingBox* bbox);
 
-
-Player* createPlayer(PerspectiveCamera* camera, Keymap& keymap);
-glm::vec3 getMovementVector(Player* player, Window* window, float maxPlayerSpeed, double delta);
-BoundingBox* checkBbox(BoundingBox* bbox, glm::vec3 oldPosition, glm::vec3 position, Scene* scene, std::vector<BoundingBox*>* checked, double delta, uint32_t* iterations);
-void updatePlayerPosition(Player* player, Scene* scene, Window* window, double delta);
-
-Scene* createScene(Window* window, Player* player, std::string gameDir);
+Scene* createScene(Window* window, std::string gameDir);
 void parseWorldIntoScene(Scene* scene, const char* file);
-Scene* parseWorld(const char* file, Window* window, Player* player, std::string gameDir);
+Scene* parseWorld(const char* file, Window* window, std::string gameDir);
 bool hasWalkmap(Scene* scene);
-void checkTriggers(Scene* scene);
+void checkTriggers(Scene* scene, Player* player);
 
 #endif

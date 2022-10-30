@@ -34,6 +34,9 @@ typedef enum {
 // window
 struct Window {
 	GLFWwindow* glfwWindow;
+	
+	int32_t width;
+	int32_t height;
 };
 
 // vertex
@@ -56,8 +59,6 @@ struct VertexData {
 
 // mesh
 struct Mesh {
-	//std::vector<Vertex>* vertices;
-	//std::vector<uint32_t>* indices;
 	VertexData* vertexData;
 	
 	TextureData* texture; // TODO: multiple?
@@ -84,8 +85,6 @@ struct RenderableObject {
 	glm::vec3 position;
 	glm::vec3 rotation;
 	glm::vec3 scale;
-	
-	std::vector<glm::vec3> corners;
 	
 	glm::mat4 modelMatrix;
 };

@@ -9,6 +9,11 @@
 
 // window management //
 
+void windowResizeCallback(GLFWwindow* window, int32_t width, int32_t height){
+	// FIXME: update window struct values in callback?
+	glViewport(0, 0, width, height);
+}
+
 // initialize glfw/glad
 // should only need to be called once at the start of the program
 InitGraphicsStatus initGraphics(){
@@ -22,8 +27,8 @@ InitGraphicsStatus initGraphics(){
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // core profile
 	
-	// temporarily make non-resizeable to avoid the render issues that causes
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	// temporarily make non-resizeable to avoid the render issues that resizing causes
+	//glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	
 	return SUCCESS;
 }
@@ -39,8 +44,12 @@ Window* createWindow(int32_t width, int32_t height, const char* title){
 	// allocate memory for window
 	Window* window = allocateMemoryForType<Window>();
 	
+	// assign settings
+	window->width = width;
+	window->height = height;
+	
 	// create glfw window
-	window->glfwWindow = (GLFWwindow*)glfwCreateWindow(width, height, title, NULL, NULL);
+	window->glfwWindow = (GLFWwindow*)glfwCreateWindow(window->width, window->height, title, NULL, NULL);
 	
 	// check to ensure window created properly
 	if(!window->glfwWindow){
@@ -58,7 +67,7 @@ Window* createWindow(int32_t width, int32_t height, const char* title){
 	}
 	
 	// set viewport size
-	glViewport(0, 0, width, height);
+	glViewport(0, 0, window->width, window->height);
 	
 	// default settings
 	glEnable(GL_DEPTH_TEST);
@@ -77,6 +86,9 @@ bool shouldWindowClose(Window* window){
 }
 
 void updateWindow(Window* window){
+	// update width/height
+	glfwGetWindowSize(window->glfwWindow, &window->width, &window->height);
+	
 	// swap buffers
 	glfwSwapBuffers(window->glfwWindow);
 	

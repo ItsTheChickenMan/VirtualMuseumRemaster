@@ -15,8 +15,7 @@
 #include <glm/gtx/norm.hpp>
 
 #define PROG_NAME "world"
-#define PROG_VERSION "0.1-dev"
-
+#define PROG_VERSION "0.0-dev"
 
 void initializeArguments(argparse::ArgumentParser& parser);
 
@@ -105,8 +104,13 @@ int main(int argc, char** argv){
 	ShaderProgramEx* lightingShader = createShaderProgramEx(lightingVs, lightingFs, true);
 	
 	// load scene things (camera, renderable objects)
-	printf("Done\nLoading scene...");
+	printf("Done\nLoading game...\n");
 	
+	Game* mainGame = createGame(window, argParser.get<std::string>("--game-dir"));
+	
+	printf("Finished loading.\n");
+	
+	/*
 	// create camera
 	// -6.594845, 5.227420, -4.362258, -0.564000, 0.656000, 0.000000
 	// 8.823283, 7.303828, 8.691005, -0.615999, 3.887995, 0.000000
@@ -130,13 +134,9 @@ int main(int argc, char** argv){
 	
 	for(uint32_t i = 0; i < walkmapPaths.size(); i++){
 		parseWorldIntoScene(scene, (*scene->gameDir + "/worlds/" + walkmapPaths[i]).c_str());
-	}
-	
-	/*for(uint32_t i = 0; i < scene->pointLights->size(); i++){
-		printf("%f, %f, %f\n", scene->pointLights->at(i)->color.x, scene->pointLights->at(i)->color.y, scene->pointLights->at(i)->color.z);
 	}*/
 	
-	printf("Done\nRender Loop Starting\n");
+	printf("Render Loop Starting\n");
 	
 	// render loop //
 	double delta = 0.0;
@@ -147,30 +147,18 @@ int main(int argc, char** argv){
 		delta = time-lastFrame;
 		lastFrame = time;
 		
-		// update camera
-		glm::vec3 rotationVector = calculateRotationVector();
-		//glm::vec3 movementVector = calculateMovementVector(window, camera);
-		
-		// update player position (works regardless of walkmap presence)
-		updatePlayerPosition(player, scene, window, delta);
-		
-		rotateCamera(camera, rotationVector);
-		constrainCameraRotation(camera, glm::vec3(glm::radians(-89.f), NO_LB, NO_LB), glm::vec3(glm::radians(89.f), NO_UB, NO_UB));
-		//translateCamera(camera, movementVector);
-		
-		// update sound listener position
-		updateListener(player->camera->position, player->camera->forward);
-		
-		// check triggers
-		checkTriggers(scene);
-		
-		//printf("fr: %f\n", 1.0/delta);
-		//printf("camera: %f, %f, %f, %f, %f, %f\n", camera->position.x, camera->position.y, camera->position.z, camera->rotation.x, camera->rotation.y, camera->rotation.z);
+		// game update //
+		updateGame(mainGame, delta);
 		
 		// reset mouse
 		resetMouseDelta();
 		
 		// sounds //
+		
+		// update sound listener position
+		updateListener(mainGame->player->camera->position, mainGame->player->camera->forward);
+		
+		// update sounds
 		updateSounds();
 		
 		// render calls //
@@ -180,7 +168,7 @@ int main(int argc, char** argv){
 		useProgramEx(lightingShader);
 		
 		// render
-		renderScene(scene, camera, lightingShader);
+		renderScene(mainGame->currentScene, mainGame->player->camera, lightingShader);
 		
 		// swap buffers
 		updateWindow(window);
@@ -217,7 +205,7 @@ void initializeArguments(argparse::ArgumentParser& parser){
 	// window related args
 	parser.add_argument("-t", "--title")
 		.help("title of game window.")
-		.default_value("World Engine");
+		.default_value(std::string("World Engine v") + PROG_VERSION);
 		
 	parser.add_argument("-w", "--width")
 		.help("pixel width of game window.")
@@ -228,52 +216,4 @@ void initializeArguments(argparse::ArgumentParser& parser){
 		.help("pixel height of game window.")
 		.default_value<uint32_t>(720)
 		.scan<'i', uint32_t>();
-}
-
-glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera){
-	// settings
-	int32_t keymap[] = {GLFW_KEY_W, GLFW_KEY_A, GLFW_KEY_S, GLFW_KEY_D, GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT};
-	
-	glm::vec3 side = glm::normalize(glm::cross(camera->forward, camera->up));
-	
-	glm::vec3 directions[] = {camera->forward, side * -1.f, camera->forward * -1.f, side, camera->up, camera->up * -1.f};
-	
-	float speed = 0.05f;
-	
-	if(glfwGetKey(window->glfwWindow, GLFW_KEY_E) == GLFW_PRESS){
-		speed /= 3.0f;
-	}
-	
-	if(glfwGetKey(window->glfwWindow, GLFW_KEY_Q) == GLFW_PRESS){
-		speed *= 3.0f;
-	}
-	
-	// calculation
-	
-	glm::vec3 movementVector = glm::vec3(0);
-	
-	
-	for(uint32_t i = 0; i < (uint32_t)sizeof(keymap)/sizeof(int32_t); i++){
-		int32_t key = keymap[i];
-		
-		if(glfwGetKey(window->glfwWindow, key) == GLFW_PRESS){
-			movementVector += directions[i];
-		}
-	}
-	
-	if(glm::length2(movementVector) != 0.0f) movementVector = glm::normalize(movementVector) * speed;
-	
-	movementVector.y = 0;
-	
-	return movementVector;
-}
-
-glm::vec3 calculateRotationVector(){
-	float sensitivity = 0.004f;
-	
-	glm::vec2 delta = getMouseDelta();
-	
-	delta *= sensitivity;
-	
-	return glm::vec3(-delta.y, delta.x, 0);
 }
