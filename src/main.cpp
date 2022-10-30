@@ -3,21 +3,11 @@
 #include <engine.h>
 #include <world.h>
 
-#include <stdexcept>
-#include <iostream>
-
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
 
-#include <argparse/argparse.hpp>
-
 #include <glm/gtx/norm.hpp>
-
-#define PROG_NAME "world"
-#define PROG_VERSION "0.0-dev"
-
-void initializeArguments(argparse::ArgumentParser& parser);
 
 glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera);
 glm::vec3 calculateRotationVector();
@@ -30,23 +20,6 @@ int main(int argc, char** argv){
 		setvbuf(stdout, NULL, _IONBF, 0);
 	#endif
 	
-	// parse arguments
-	argparse::ArgumentParser argParser = argparse::ArgumentParser(PROG_NAME, PROG_VERSION);
-	
-	initializeArguments(argParser);
-	
-	try {
-		argParser.parse_args(argc, argv);
-	} catch (const std::runtime_error& err) {
-		std::cerr << err.what() << std::endl;
-		std::cerr << argParser; // NOTE: logs help message
-		
-		exit(EXIT_FAILURE);
-	}
-	
-	// get game directory
-	std::string gameDir = argParser.get<std::string>("--game-dir");
-	
 	// initialize graphics
 	if(initGraphics() != SUCCESS){
 		printf("There was an error initializing graphics\n");
@@ -56,21 +29,23 @@ int main(int argc, char** argv){
 	// create render window
 	printf("Creating window...");
 	
-	uint32_t screenWidth = argParser.get<uint32_t>("-w");
-	uint32_t screenHeight = argParser.get<uint32_t>("-h");
+	// TODO: args parser
+	//uint32_t screenWidth = 1280;
+	uint32_t screenWidth = 800;
 	
-	std::string title = argParser.get<std::string>("-t");
+	//uint32_t screenHeight = 720;
+	uint32_t screenHeight = 600;
 	
-	Window* window = createWindow(screenWidth, screenHeight, title.c_str());
+	float xSensitivity = 0.5f;
+	float ySensitivity = 0.5f;
+	
+	Window* window = createWindow(screenWidth, screenHeight, "Virtual Museum Remastered");
 	
 	// make sure it exists
 	if(window == NULL){
 		printf("\nThere was an error creating the render window\n");
 		exit(EXIT_FAILURE);
 	}
-	
-	float xSensitivity = 0.5f;
-	float ySensitivity = 0.5f;
 	
 	initMouseManager(window, xSensitivity, ySensitivity);
 	
@@ -98,19 +73,22 @@ int main(int argc, char** argv){
 	//ShaderProgramEx* textureTestShader = createShaderProgramEx(textureTestVs, textureTestFs, true);
 	
 	// lighting shader
-	uint32_t lightingVs = createShader(GL_VERTEX_SHADER, "./shader/lighting/vertex.glsl");
-	uint32_t lightingFs = createShader(GL_FRAGMENT_SHADER, "./shader/lighting/fragment.glsl");
+	uint32_t lightingVs = createShader(GL_VERTEX_SHADER, "./res/shader/lighting/vertex.glsl");
+	uint32_t lightingFs = createShader(GL_FRAGMENT_SHADER, "./res/shader/lighting/fragment.glsl");
 	
 	ShaderProgramEx* lightingShader = createShaderProgramEx(lightingVs, lightingFs, true);
 	
+	// load sounds
+	printf("Done\nLoading sounds...");
+	
+	std::string filenames[] = {"./res/sounds/test1.ogg", "./res/sounds/test2.ogg"};
+	std::string keys[] = {"test1", "test2"};
+	
+	loadSoundFileBatch(filenames, keys, sizeof(filenames)/sizeof(std::string));
+	
 	// load scene things (camera, renderable objects)
-	printf("Done\nLoading game...\n");
+	printf("Done\nLoading scene...");
 	
-	Game* mainGame = createGame(window, argParser.get<std::string>("--game-dir"));
-	
-	printf("Finished loading.\n");
-	
-	/*
 	// create camera
 	// -6.594845, 5.227420, -4.362258, -0.564000, 0.656000, 0.000000
 	// 8.823283, 7.303828, 8.691005, -0.615999, 3.887995, 0.000000
@@ -121,22 +99,19 @@ int main(int argc, char** argv){
 	
 	Player* player = createPlayer(camera, keymap);
 	
-	// create scene
-	Scene* scene = createScene(window, player, argParser.get<std::string>("--game-dir"));
+	// parse world
+	Scene* scene = createScene(window, player);
 	
 	// load any world/walkmap files from arguments
-	std::vector<std::string> worldPaths = argParser.get<std::vector<std::string>>("--world");
-	std::vector<std::string> walkmapPaths = argParser.get<std::vector<std::string>>("--walkmap");
-	
-	for(uint32_t i = 0; i < worldPaths.size(); i++){
-		parseWorldIntoScene(scene, (*scene->gameDir + "/worlds/" + worldPaths[i]).c_str());
+	for(uint32_t i = 1; i < argc; i++){
+		parseWorldIntoScene(scene, argv[i]);
 	}
 	
-	for(uint32_t i = 0; i < walkmapPaths.size(); i++){
-		parseWorldIntoScene(scene, (*scene->gameDir + "/worlds/" + walkmapPaths[i]).c_str());
+	/*for(uint32_t i = 0; i < scene->pointLights->size(); i++){
+		printf("%f, %f, %f\n", scene->pointLights->at(i)->color.x, scene->pointLights->at(i)->color.y, scene->pointLights->at(i)->color.z);
 	}*/
 	
-	printf("Render Loop Starting\n");
+	printf("Done\nRender Loop Starting\n");
 	
 	// render loop //
 	double delta = 0.0;
@@ -147,18 +122,30 @@ int main(int argc, char** argv){
 		delta = time-lastFrame;
 		lastFrame = time;
 		
-		// game update //
-		updateGame(mainGame, delta);
+		// update camera
+		glm::vec3 rotationVector = calculateRotationVector();
+		//glm::vec3 movementVector = calculateMovementVector(window, camera);
+		
+		// update player position (works regardless of walkmap presence)
+		updatePlayerPosition(player, scene, window, delta);
+		
+		rotateCamera(camera, rotationVector);
+		constrainCameraRotation(camera, glm::vec3(glm::radians(-89.f), NO_LB, NO_LB), glm::vec3(glm::radians(89.f), NO_UB, NO_UB));
+		//translateCamera(camera, movementVector);
+		
+		// update sound listener position
+		updateListener(player->camera->position, player->camera->forward);
+		
+		// check triggers
+		checkTriggers(scene);
+		
+		//printf("fr: %f\n", 1.0/delta);
+		//printf("camera: %f, %f, %f, %f, %f, %f\n", camera->position.x, camera->position.y, camera->position.z, camera->rotation.x, camera->rotation.y, camera->rotation.z);
 		
 		// reset mouse
 		resetMouseDelta();
 		
 		// sounds //
-		
-		// update sound listener position
-		updateListener(mainGame->player->camera->position, mainGame->player->camera->forward);
-		
-		// update sounds
 		updateSounds();
 		
 		// render calls //
@@ -168,7 +155,7 @@ int main(int argc, char** argv){
 		useProgramEx(lightingShader);
 		
 		// render
-		renderScene(mainGame->currentScene, mainGame->player->camera, lightingShader);
+		renderScene(scene, camera, lightingShader);
 		
 		// swap buffers
 		updateWindow(window);
@@ -182,38 +169,50 @@ int main(int argc, char** argv){
 	return EXIT_SUCCESS;
 }
 
-// set up argument parser
-void initializeArguments(argparse::ArgumentParser& parser){
-	// description
-	parser.add_description("Loads a game into the world engine.");
+glm::vec3 calculateMovementVector(Window* window, PerspectiveCamera* camera){
+	// settings
+	int32_t keymap[] = {GLFW_KEY_W, GLFW_KEY_A, GLFW_KEY_S, GLFW_KEY_D, GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT};
 	
-	// game related args
-	parser.add_argument("--game-dir")
-		.help("directory to the game's files.")
-		.required();
-		
-	parser.add_argument("--world")
-		.help("path to a .world file to load, relative to the worlds folder in the game dir.  this can be used multiple times to load multiple .world files.")
-		.default_value<std::vector<std::string>>({})
-		.append();
-		
-	parser.add_argument("--walkmap")
-		.help("path to a .walkmap file to load, relative to the worlds folder in the game dir.  this can be used multiple times to load multiple .walkmap files.")
-		.default_value<std::vector<std::string>>({})
-		.append();
+	glm::vec3 side = glm::normalize(glm::cross(camera->forward, camera->up));
 	
-	// window related args
-	parser.add_argument("-t", "--title")
-		.help("title of game window.")
-		.default_value(std::string("World Engine v") + PROG_VERSION);
+	glm::vec3 directions[] = {camera->forward, side * -1.f, camera->forward * -1.f, side, camera->up, camera->up * -1.f};
+	
+	float speed = 0.05f;
+	
+	if(glfwGetKey(window->glfwWindow, GLFW_KEY_E) == GLFW_PRESS){
+		speed /= 3.0f;
+	}
+	
+	if(glfwGetKey(window->glfwWindow, GLFW_KEY_Q) == GLFW_PRESS){
+		speed *= 3.0f;
+	}
+	
+	// calculation
+	
+	glm::vec3 movementVector = glm::vec3(0);
+	
+	
+	for(uint32_t i = 0; i < (uint32_t)sizeof(keymap)/sizeof(int32_t); i++){
+		int32_t key = keymap[i];
 		
-	parser.add_argument("-w", "--width")
-		.help("pixel width of game window.")
-		.default_value<uint32_t>(1280)
-		.scan<'i', uint32_t>();
-		
-	parser.add_argument("-h", "--height")
-		.help("pixel height of game window.")
-		.default_value<uint32_t>(720)
-		.scan<'i', uint32_t>();
+		if(glfwGetKey(window->glfwWindow, key) == GLFW_PRESS){
+			movementVector += directions[i];
+		}
+	}
+	
+	if(glm::length2(movementVector) != 0.0f) movementVector = glm::normalize(movementVector) * speed;
+	
+	movementVector.y = 0;
+	
+	return movementVector;
+}
+
+glm::vec3 calculateRotationVector(){
+	float sensitivity = 0.004f;
+	
+	glm::vec2 delta = getMouseDelta();
+	
+	delta *= sensitivity;
+	
+	return glm::vec3(-delta.y, delta.x, 0);
 }

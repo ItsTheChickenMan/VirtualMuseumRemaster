@@ -1,11 +1,11 @@
-# tests for walkmap (not really for the world parser, basic.world is better at testing the world parser's limits)
-# made for 0.4f step height, 2.0f height, 0.25f player radius, and whatever max speed
+# tests for walkmap (not really for the .world parser, basic.world is better at testing the .world parser's limits)
+# made for 0.1f step height, 2.0f height, 0.25f player radius, and whatever max speed
 
 # texture initialization blocks
 
-%[grid.png, default]
-%[./oldmuseum/greyfloor.png, floor]
-%[./oldmuseum/wall.png, wall]
+%[./res/textures/grid.png, default]
+%[./res/textures/oldmuseum/greyfloor.png, floor]
+%[./res/textures/oldmuseum/wall.png, wall]
 
 # vertex data initialization blocks
 
@@ -18,55 +18,55 @@
 # object blocks
 
 # test 1 - ultra basic (splitter test)
-$[0, 0, 0,    0, 0, 0,    10, 1, 10,    floor,    cube]
-$[5, 1, 0,    0, 0, 0,    2, 1, 2,    wall,    cube]
-$[0, 1, 5,    0, 0, 0,    2, 1, 2,    wall,    cube]
+# $[0, 0, 0,    0, 0, 0,    10, 1, 10,    floor,    cube]
+# $[5, 1, 0,    0, 0, 0,    2, 1, 2,    wall,    cube]
+# $[0, 1, 5,    0, 0, 0,    2, 1, 2,    wall,    cube]
 
 # test 2 - basic (general test)
-$[0, 0, 0,    0, 0, 0,    10, 1, 10,    floor,    cube]
-$[2.5, 1, 0,    0, 0, 0,    1, 1, 1,    wall,    cube]
-$[-2.5, 1, -1,    0, 0, 0,    1, 1, 1,    wall,    cube]
-$[-4, 0.7, 4,    0, 0, 0,    1, 0.4, 1,    wall,    cube]
-$[-4, 1.1, 5,    0, 0, 0,    1, 0.4, 1,    wall,    cube]
+# $[0, 0, 0,    0, 0, 0,    10, 1, 10,    floor,    cube]
+# $[2.5, 1, 0,    0, 0, 0,    1, 1, 1,    wall,    cube]
+# $[-2.5, 1, -1,    0, 0, 0,    1, 1, 1,    wall,    cube]
+# $[-4, 0.7, 4,    0, 0, 0,    1, 0.4, 1,    wall,    cube]
+# $[-4, 1.1, 5,    0, 0, 0,    1, 0.4, 1,    wall,    cube]
 
 # test 3 - stairs (general test) (made for 0.1f step height)
-$[0.0, 0.0, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[0.4, 0.1, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[0.8, 0.2, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[1.2, 0.3, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[1.6, 0.4, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[0.0, 0.0, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[0.4, 0.1, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[0.8, 0.2, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[1.2, 0.3, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[1.6, 0.4, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
 
 # test 4 - out of order stairs (height sort test)
-$[1.2, 0.3, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[0.4, 0.1, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[0.8, 0.2, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[1.6, 0.4, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[0.0, 0.0, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[1.2, 0.3, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[0.4, 0.1, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[0.8, 0.2, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[1.6, 0.4, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[0.0, 0.0, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
 
 # test 5 - stairs lead up to platform lead down to stairs (adjacency test)
-$[ 0.0,   0.0, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 0.4,   0.1, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 0.8,   0.2, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 1.2,   0.3, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 1.6,   0.4, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 2.8,   0.5, 3,    0, 0, 0,    2.0, 0.1, 8,    floor,    cube]
-$[ 1.6,   0.4, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 1.2,   0.3, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 0.8,   0.2, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 0.4,   0.1, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[ 0.0,   0.0, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[-0.4,  -0.1, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[-0.8,  -0.2, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[-1.2,  -0.3, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
-$[-1.6,  -0.4, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 0.0,   0.0, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 0.4,   0.1, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 0.8,   0.2, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 1.2,   0.3, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 1.6,   0.4, 0,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 2.8,   0.5, 3,    0, 0, 0,    2.0, 0.1, 8,    floor,    cube]
+# $[ 1.6,   0.4, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 1.2,   0.3, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 0.8,   0.2, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 0.4,   0.1, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[ 0.0,   0.0, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[-0.4,  -0.1, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[-0.8,  -0.2, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[-1.2,  -0.3, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
+# $[-1.6,  -0.4, 6,    0, 0, 0,    0.4, 0.1, 2,    floor,    cube]
 
 # test 6 - stairs spiral up to platform (adjacency test)
-$[0.0, 0.0, 0.0,    0, 0, 0,    5, 1, 5,    floor,    cube]
-$[1.25, 0.7, 1.25,    0, 0, 0,    2.5, 0.4, 2.5,    wall,    cube]
-$[1.25, 1.1, 1.40625,    0, 0, 0,    2.5, 0.4, 2.1875,    wall,    cube]
-$[1.25, 1.5, 1.56250,    0, 0, 0,    2.5, 0.4, 1.8750,    wall,    cube]
-$[1.25, 1.9, 1.71875,    0, 0, 0,    2.5, 0.4, 1.5625,    wall,    cube]
-$[0, 1.3, 3.5,    0, 0, 0,    5, 1.6, 2,    wall,    cube]
+# $[0.0, 0.0, 0.0,    0, 0, 0,    5, 1, 5,    floor,    cube]
+# $[1.25, 0.7, 1.25,    0, 0, 0,    2.5, 0.4, 2.5,    wall,    cube]
+# $[1.25, 1.1, 1.40625,    0, 0, 0,    2.5, 0.4, 2.1875,    wall,    cube]
+# $[1.25, 1.5, 1.56250,    0, 0, 0,    2.5, 0.4, 1.8750,    wall,    cube]
+# $[1.25, 1.9, 1.71875,    0, 0, 0,    2.5, 0.4, 1.5625,    wall,    cube]
+# $[0, 1.3, 3.5,    0, 0, 0,    5, 1.6, 2,    wall,    cube]
 
 # test 7 - thin lines (engine test)
 $[0,0,0.000, 0,0,0, 5,0.5,0.01, floor, cube]

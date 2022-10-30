@@ -98,14 +98,14 @@
 
 # texture initialization blocks
 
-%[default.png, default]
-%[./oldmuseum/greyfloor.png, floor]
-%[./oldmuseum/wall.png, wall]
+%[./res/textures/default.png, default]
+%[./res/textures/oldmuseum/greyfloor.png, floor]
+%[./res/textures/oldmuseum/wall.png, wall]
 
 # audio blocks
 
-.[test1.ogg, test1]
-.[test2.ogg, test2]
+.[./res/sounds/test1.ogg, test1]
+.[./res/sounds/test2.ogg, test2]
 
 # vertex data initialization blocks
 
@@ -114,10 +114,10 @@
 
 # model blocks
 
-+[Avocado.glb, avocado, 0, 3.15, 0, 5, 6.5, 3]
-+[SmilingFace.glb, smiley, 0, 0, -0.05, 1.7, 1.7, 1.7]
-+[CesiumMan.glb, man, 0, 0, 0.75, 0.4, 1.15, 1.55]
-+[archway.glb, archway, 0, 0, 0, 5, 1, 8]
++[./res/models/Avocado.glb, avocado, 0, 3.15, 0, 5, 6.5, 3]
++[./res/models/SmilingFace.glb, smiley, 0, 0, -0.05, 1.7, 1.7, 1.7]
++[./res/models/CesiumMan.glb, man, 0, 0, 0.75, 0.4, 1.15, 1.55]
++[./res/models/archway.glb, archway, 0, 0, 0, 5, 1, 8]
 
 
 # object blocks
@@ -161,7 +161,7 @@ $[0, 1, 4,     0, 180, 0,    0.2, 0.2, 0.2,    avocado]
 ![0,0,0,0,0,0, onStart, logToConsole (Hello, World)]
 
 # play background music on start
-![0,0,0,0,0,0, onStart, playBackgroundMusic (stal.ogg, 2, true)]
+![0,0,0,0,0,0, onStart, playBackgroundMusic (./res/sounds/stal.ogg, 2, true)]
 
 # change height every time the player goes near the cesium man
 ![3, 2.5, 1, 1, 4, 1, onEnterRepeating, changeSetting (0, 4.4)]

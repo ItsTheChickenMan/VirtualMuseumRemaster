@@ -1,10 +1,10 @@
 # makefile for virtual museum project
 
 # compiler info
-CC=g++
+CC=gcc
 
 # project info
-OUT=world
+OUT=VirtualMuseum
 
 # directories
 INSTALL_DIR=./bin/
@@ -12,11 +12,6 @@ INCLUDE_DIR=./include/
 LIB_DIRS=./lib/
 SRC_DIR=./src/
 OBJ_DIR=$(INSTALL_DIR)obj/
-
-# installation prefix
-ifeq ($(PREFIX),)
-	PREFIX := /usr/local/
-endif
 
 # obj formatting
 _OBJ=glad.o utils.o audio.o mouse.o texture.o lighting.o shader.o camera.o graphics.o world.o engine.o main.o
@@ -30,7 +25,7 @@ LIBS=-lglfw3 -lopengl32 -lsfml-audio-s -lsfml-system-s -lopenal32 -lFLAC -lvorbi
 
 # compiler flags
 CFLAGS=-Werror -g
-	
+
 # make all targets
 .PHONY: all
 all: $(INSTALL_DIR)$(OUT)
