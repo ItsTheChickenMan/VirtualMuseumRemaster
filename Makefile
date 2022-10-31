@@ -1,7 +1,7 @@
 # makefile for virtual museum project
 
 # compiler info
-CC=gcc
+CC=g++
 
 # project info
 OUT=VirtualMuseum
