@@ -26,6 +26,18 @@ LIBS=-lglfw3 -lopengl32 -lsfml-audio-s -lsfml-system-s -lopenal32 -lFLAC -lvorbi
 # compiler flags
 CFLAGS=-Werror -g
 
+# commands
+ifndef ENV
+	ENV=make
+endif
+
+mkdir=mkdir -p
+
+# commands for window environment
+ifeq ($(ENV),mingw)
+	mkdir=mkdir
+endif
+
 # make all targets
 .PHONY: all
 all: $(INSTALL_DIR)$(OUT)
@@ -37,6 +49,11 @@ clean: clearobj all
 .PHONY: clearobj
 clearobj:
 	@rm -rf $(OBJ_DIR)
+	
+.PHONY: wintest
+wintest:
+	@echo "env = $(ENV)"
+	@echo "mkdir = $(mkdir)"
 
 # main target
 $(INSTALL_DIR)$(OUT): $(OBJ) 
