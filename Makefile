@@ -82,6 +82,6 @@ $(OBJ_DIR)main.o: $(SRC_DIR)main.cpp $(INCLUDE_DIR)shapes.h
 # obj rule
 $(OBJ):
 	@echo building $@
-	@mkdir -p $(OBJ_DIR)
+	@$(mkdir) $(OBJ_DIR)
 	@$(CXX) -c -o $@ $< $(CFLAGS) -I$(INCLUDE_DIR) $(LIB) $(LIBS)
 	@echo built $@
