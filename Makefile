@@ -18,18 +18,22 @@ ifndef ENV
 	ENV=make
 endif
 
+windowsslashes= $(subst /,\\,$(1))
+
 mkdir=mkdir -p $(1)
+rm=rm -rf $(1)
 
 # commands for window environment
 ifeq ($(ENV),mingw)
 	mkdir=if not exist $(1) mkdir $(1)
+	rm=del /Q $(1)
 	
 	# change backslashes
-	INSTALL_DIR:=$(subst /,\\,$(INSTALL_DIR))
-	INCLUDE_DIR:=$(subst /,\\,$(INCLUDE_DIR))
-	LIB_DIRS:=$(subst /,\\,$(LIB_DIRS))
-	SRC_DIR:=$(subst /,\\,$(SRC_DIR))
-	OBJ_DIR:=$(subst /,\\,$(OBJ_DIR))
+#	INSTALL_DIR:=$(subst /,\\,$(INSTALL_DIR))
+#	INCLUDE_DIR:=$(subst /,\\,$(INCLUDE_DIR))
+#	LIB_DIRS:=$(subst /,\\,$(LIB_DIRS))
+#	SRC_DIR:=$(subst /,\\,$(SRC_DIR))
+#	OBJ_DIR:=$(subst /,\\,$(OBJ_DIR))
 endif
 
 # obj formatting
@@ -55,13 +59,15 @@ clean: clearobj all
 	
 .PHONY: clearobj
 clearobj:
-	@rm -rf $(OBJ_DIR)
+	@$(call rm,$(OBJ_DIR))
 	
 .PHONY: wintest
 wintest:
 	@echo "env = $(ENV)"
 	@echo "mkdir = $(call mkdir,$(INSTALL_DIR))"
-	@echo "objects = $(OBJ)"
+	@echo "rm = $(call rm,$(OBJ_DIR))"
+	@echo "objects = $(call windowsslashes,$(OBJ))"
+	@echo "main = $(OBJ_DIR)main.o"
 
 # main target
 $(INSTALL_DIR)$(OUT): $(OBJ) 
@@ -90,6 +96,6 @@ $(OBJ_DIR)main.o: $(SRC_DIR)main.cpp $(INCLUDE_DIR)shapes.h
 # obj rule
 $(OBJ):
 	@echo building $@
-	@$(call mkdir,$(OBJ_DIR))
+	@$(call mkdir,$(call windowsslashes,$(OBJ_DIR)))
 	@$(CXX) -c -o $@ $< $(CFLAGS) -I$(INCLUDE_DIR) $(LIB) $(LIBS)
 	@echo built $@
