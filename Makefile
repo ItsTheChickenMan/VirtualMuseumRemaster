@@ -13,6 +13,25 @@ LIB_DIRS=./lib/
 SRC_DIR=./src/
 OBJ_DIR=$(INSTALL_DIR)obj/
 
+# commands
+ifndef ENV
+	ENV=make
+endif
+
+mkdir=mkdir -p $(1)
+
+# commands for window environment
+ifeq ($(ENV),mingw)
+	mkdir=if not exist $(1) mkdir $(1)
+	
+	# change backslashes
+	INSTALL_DIR:=$(subst /,\\,$(INSTALL_DIR))
+	INCLUDE_DIR:=$(subst /,\\,$(INCLUDE_DIR))
+	LIB_DIRS:=$(subst /,\\,$(LIB_DIRS))
+	SRC_DIR:=$(subst /,\\,$(SRC_DIR))
+	OBJ_DIR:=$(subst /,\\,$(OBJ_DIR))
+endif
+
 # obj formatting
 _OBJ=glad.o utils.o audio.o mouse.o texture.o lighting.o shader.o camera.o graphics.o world.o engine.o main.o
 OBJ=$(patsubst %,$(OBJ_DIR)%,$(_OBJ))
@@ -25,18 +44,6 @@ LIBS=-lglfw3 -lopengl32 -lsfml-audio-s -lsfml-system-s -lopenal32 -lFLAC -lvorbi
 
 # compiler flags
 CFLAGS=-Werror -g
-
-# commands
-ifndef ENV
-	ENV=make
-endif
-
-mkdir=mkdir -p
-
-# commands for window environment
-ifeq ($(ENV),mingw)
-	mkdir=mkdir
-endif
 
 # make all targets
 .PHONY: all
@@ -53,7 +60,8 @@ clearobj:
 .PHONY: wintest
 wintest:
 	@echo "env = $(ENV)"
-	@echo "mkdir = $(mkdir)"
+	@echo "mkdir = $(call mkdir,$(INSTALL_DIR))"
+	@echo "objects = $(OBJ)"
 
 # main target
 $(INSTALL_DIR)$(OUT): $(OBJ) 
@@ -82,6 +90,6 @@ $(OBJ_DIR)main.o: $(SRC_DIR)main.cpp $(INCLUDE_DIR)shapes.h
 # obj rule
 $(OBJ):
 	@echo building $@
-	@$(mkdir) $(OBJ_DIR)
+	@$(call mkdir,$(OBJ_DIR))
 	@$(CXX) -c -o $@ $< $(CFLAGS) -I$(INCLUDE_DIR) $(LIB) $(LIBS)
 	@echo built $@
